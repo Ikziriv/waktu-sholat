@@ -4,9 +4,17 @@
 # golang:1.25-bookworm has Go + apt for Node (Tailwind v4 CLI needs npm).
 FROM golang:1.25-bookworm AS build
 
-# Node for `npx @tailwindcss/cli` (Tailwind v4).
+# Node 20+ for `npx @tailwindcss/cli` (Tailwind v4's @tailwindcss/oxide
+# native binding requires Node >= 20; Bookworm's apt nodejs is only 18).
 RUN apt-get update \
-    && apt-get install -y --no-install-recommends nodejs npm \
+    && apt-get install -y --no-install-recommends ca-certificates curl gnupg \
+    && mkdir -p /etc/apt/keyrings \
+    && curl -fsSL https://deb.nodesource.com/gpg/nodesource-repo.gpg.key \
+        | gpg --dearmor -o /etc/apt/keyrings/nodesource.gpg \
+    && echo "deb [signed-by=/etc/apt/keyrings/nodesource.gpg] https://deb.nodesource.com/node_20.x nodistro main" \
+        > /etc/apt/sources.list.d/nodesource.list \
+    && apt-get update \
+    && apt-get install -y --no-install-recommends nodejs \
     && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /src
