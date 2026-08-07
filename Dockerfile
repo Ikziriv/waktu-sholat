@@ -1,21 +1,18 @@
 # syntax=docker/dockerfile:1
 
-# ---- build stage ----
-# golang:1.25-bookworm has Go + apt for Node (Tailwind v4 CLI needs npm).
-FROM golang:1.25-bookworm AS build
+# ---- tailwind stage ----
+# Node 22 ships Node >= 20, which @tailwindcss/oxide's native binding needs.
+# Isolating Tailwind in its own stage avoids NodeSource's apt repo (its GPG
+# key uses SHA1, which apt rejects since Feb 2026) and keeps Node out of the
+# Go image. Tailwind v4 auto-scans the working tree for class names, so the
+# *.templ sources must be present here.
+FROM node:22-bookworm-slim AS tailwind
+WORKDIR /src
+COPY . .
+RUN npx --yes @tailwindcss/cli -i input.css -o static/out.css --minify
 
-# Node 20+ for `npx @tailwindcss/cli` (Tailwind v4's @tailwindcss/oxide
-# native binding requires Node >= 20; Bookworm's apt nodejs is only 18).
-RUN apt-get update \
-    && apt-get install -y --no-install-recommends ca-certificates curl gnupg \
-    && mkdir -p /etc/apt/keyrings \
-    && curl -fsSL https://deb.nodesource.com/gpg/nodesource-repo.gpg.key \
-        | gpg --dearmor -o /etc/apt/keyrings/nodesource.gpg \
-    && echo "deb [signed-by=/etc/apt/keyrings/nodesource.gpg] https://deb.nodesource.com/node_20.x nodistro main" \
-        > /etc/apt/sources.list.d/nodesource.list \
-    && apt-get update \
-    && apt-get install -y --no-install-recommends nodejs \
-    && rm -rf /var/lib/apt/lists/*
+# ---- build stage ----
+FROM golang:1.25-bookworm AS build
 
 WORKDIR /src
 
@@ -33,8 +30,8 @@ COPY . .
 # Generate templ Go files from *.templ.
 RUN templ generate
 
-# Compile Tailwind v4 → static/out.css.
-RUN npx --yes @tailwindcss/cli -i input.css -o static/out.css --minify
+# Pull the compiled CSS from the tailwind stage (no Node needed here).
+COPY --from=tailwind /src/static/out.css static/out.css
 
 # Build the web binary (no `desktop` tag → main.go web entrypoint, not Wails).
 # CGO_ENABLED=0 → static binary; -s -w strips debug info for a smaller image.
