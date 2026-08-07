@@ -547,6 +547,180 @@
     cursor: not-allowed;
   }
 
+  /* Onboarding — first-run two-step welcome (Surah Al-Asr → location).
+     Both steps live in the DOM; the inactive one is absolutely positioned
+     (inset:0) over the container, faded out + lifted + non-interactive.
+     The active step is position:relative so the container sizes to it.
+     Compositor-only transition (opacity + transform) = 60fps.
+     Solid surface card so the Surah/location text reads clearly against
+     the 3D moon canvas; the viewfinder-full eclipse ::before (meant for
+     the compass) is suppressed here — it would darken a circle in the
+     middle of the card and clip the confirm button at the bottom edge. */
+  .onboarding {
+    position: relative;
+  }
+  .onboarding-step {
+    /* Glassmorphism — translucent surface lets the 3D moon read softly
+       through the card (premium depth) while backdrop-blur keeps text
+       crisp. Replaces the old solid #0a0a0a patch that read as a dark
+       "shadow" behind the surah. Inset top hairline = the machined-glass
+       highlight; soft outer shadow roots the card in space. */
+    background: color-mix(in srgb, var(--color-surface) 55%, transparent);
+    backdrop-filter: blur(24px) saturate(140%);
+    -webkit-backdrop-filter: blur(24px) saturate(140%);
+    border: 1px solid var(--color-border);
+    box-shadow:
+      inset 0 1px 0 color-mix(in srgb, var(--color-fg) 8%, transparent),
+      0 24px 64px -24px var(--color-shadow);
+    transition: opacity 0.4s cubic-bezier(0.22, 1, 0.36, 1),
+                transform 0.4s cubic-bezier(0.22, 1, 0.36, 1);
+  }
+  /* Suppress the compass eclipse backdrop on onboarding cards — the
+     darkened circle + inset box-shadow is the compass instrument's
+     moon-dimmer and must never bleed through the surah glass. */
+  .onboarding-step.viewfinder-full::before {
+    content: none;
+  }
+
+  /* Mulai — onboarding welcome CTA. Premium accent pill with a nested
+     trailing-arrow chip (button-in-button). Full-width on mobile for
+     thumb reach; auto-width + centered on desktop. Press feedback
+     follows Apple's direct-manipulation feel: instant scale on active,
+     no transition delay. GPU-safe (transform/opacity only). */
+  .onboarding-start {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.625rem;
+    width: 100%;
+    margin-top: 0.5rem;
+    padding: 0.875rem 1.5rem;
+    border-radius: 9999px;
+    background: var(--color-accent);
+    color: var(--color-bg);
+    border: none;
+    font-family: var(--font-mono);
+    font-size: 0.8125rem;
+    font-weight: 500;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    cursor: pointer;
+    box-shadow:
+      inset 0 1px 0 rgba(255, 255, 255, 0.25),
+      0 8px 24px -10px color-mix(in srgb, var(--color-accent) 70%, transparent);
+    transition: transform 0.1s ease,
+                box-shadow 0.25s ease,
+                background-color 0.25s ease;
+  }
+  .onboarding-start:hover {
+    background: var(--color-accent-2);
+    box-shadow:
+      inset 0 1px 0 rgba(255, 255, 255, 0.3),
+      0 12px 32px -10px color-mix(in srgb, var(--color-accent) 80%, transparent);
+  }
+  .onboarding-start:active { transform: scale(0.97); }
+  .onboarding-start-arrow {
+    display: grid;
+    place-items: center;
+    width: 1.5rem;
+    height: 1.5rem;
+    border-radius: 9999px;
+    background: color-mix(in srgb, var(--color-bg) 18%, transparent);
+    font-size: 0.75rem;
+    line-height: 1;
+    transition: transform 0.25s cubic-bezier(0.32, 0.72, 0, 1);
+  }
+  .onboarding-start:hover .onboarding-start-arrow {
+    transform: translateX(2px);
+  }
+  @media (min-width: 768px) {
+    .onboarding-start {
+      width: max-content;
+      margin-inline: auto;
+    }
+  }
+
+  /* Surah transliteration disclosure — collapsed by default so the Mulai
+     CTA gets proper breathing room. The toggle is a thin mission-control
+     strip (label + +/− glyph). Content height animates via the
+     grid-template-rows 0fr→1fr technique: no JS height measurement,
+     no layout thrash, GPU-cheap, 60fps, and reversible mid-flight.
+     Inner opacity fades slightly delayed so text doesn't appear before
+     the frame opens. Reduced-motion: instant snap, no transition. */
+  .surah-disclosure-toggle {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    width: 100%;
+    padding: 0.5rem 0;
+    border: none;
+    border-top: 1px solid var(--color-border-2);
+    background: transparent;
+    color: var(--color-fg-dim);
+    font-family: var(--font-mono);
+    font-size: 0.625rem;
+    font-weight: 500;
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    cursor: pointer;
+    transition: color 0.2s ease;
+  }
+  .surah-disclosure-toggle:hover,
+  .surah-disclosure-toggle:focus-visible {
+    color: var(--color-fg-muted);
+    outline: none;
+  }
+  .surah-disclosure-icon {
+    display: grid;
+    place-items: center;
+    width: 1rem;
+    height: 1rem;
+    font-size: 0.75rem;
+    line-height: 1;
+    color: var(--color-accent);
+    transition: transform 0.4s cubic-bezier(0.22, 1, 0.36, 1);
+  }
+  .surah-disclosure-toggle[aria-expanded="true"] .surah-disclosure-icon {
+    transform: rotate(45deg);
+  }
+
+  .surah-disclosure-content {
+    display: grid;
+    grid-template-rows: 0fr;
+    transition: grid-template-rows 0.4s cubic-bezier(0.22, 1, 0.36, 1);
+  }
+  .surah-disclosure-toggle[aria-expanded="true"] + .surah-disclosure-content {
+    grid-template-rows: 1fr;
+  }
+  .surah-disclosure-inner {
+    overflow: hidden;
+    min-height: 0;
+    opacity: 0;
+    padding-inline: 0;
+    transition: opacity 0.3s ease 0.05s;
+  }
+  .surah-disclosure-toggle[aria-expanded="true"] + .surah-disclosure-content .surah-disclosure-inner {
+    opacity: 1;
+    padding-block: 0.5rem 0.75rem;
+  }
+
+  .onboarding[data-step="1"] .onboarding-step-2,
+  .onboarding[data-step="2"] .onboarding-step-1 {
+    opacity: 0;
+    transform: translateY(12px);
+    pointer-events: none;
+    position: absolute;
+    inset: 0;
+  }
+  .onboarding[data-step="1"] .onboarding-step-1,
+  .onboarding[data-step="2"] .onboarding-step-2 {
+    opacity: 1;
+    transform: translateY(0);
+    pointer-events: auto;
+    position: relative;
+    margin-block: auto;
+  }
+
   /* Theme toggle — glass island pill, top-right. Both icons always visible;
      a sliding accent indicator eases between sun (light, left) and moon
      (dark, right). --active (0/1) is set on the button by syncThemeIcon().
@@ -614,6 +788,10 @@
   .prayer-indicator,
   .theme-toggle-indicator,
   .theme-toggle,
+  .onboarding-step,
+  .surah-disclosure-content,
+  .surah-disclosure-inner,
+  .surah-disclosure-icon,
   body {
     transition: none !important;
   }

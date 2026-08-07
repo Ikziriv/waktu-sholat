@@ -242,13 +242,31 @@ templ MoonCanvas() {
 				  .to(galaxyMat, { opacity: galaxyTarget, duration: 1.8 }, "-=1.5")
 				  .to(bgMat.uniforms.uOpacity, { value: bgTarget, duration: 1.5 }, "-=1.2");
 
-				// GSAP content reveal — stagger hero elements.
+				// GSAP content reveal — compass-anchored staging.
+				// The compass is the hero focal point: it lands first with an
+				// overshoot scale-in, then clock (left) + next-prayer (right)
+				// flank it, then the prayer picker and bottom nav cascade in.
+				// On the onboarding screen (no .hero-cell-center) we fall back
+				// to a flat stagger of .hero-reveal cards.
 				// The bottom nav wrap carries .hero-reveal so it fades in with
 				// the rest; the inner .hero-nav is controlled by CSS collapse
 				// (no GSAP inline opacity here, which would fight the collapse).
-				gsap.from(".hero-reveal", {
-					y: 30, opacity: 0, duration: 0.8, stagger: 0.12, ease: "power3.out", delay: 0.5
-				});
+				// ponytail: per-load reveal (no just-onboarded flag) — the moon
+				// already fades in every load, so this is consistent, and a
+				// one-shot cookie for one animation isn't worth the state.
+				var compassCell = document.querySelector('.hero-cell-center');
+				if (compassCell) {
+					var heroTl = gsap.timeline({ defaults: { ease: "power3.out" } });
+					heroTl.from(compassCell, { scale: 0.82, opacity: 0, duration: 1.1, ease: "back.out(1.4)" }, 0.5)
+					      .from(".hero-cell-left", { y: 24, opacity: 0, duration: 0.7 }, 0.75)
+					      .from(".hero-cell-right", { y: 24, opacity: 0, duration: 0.7 }, 0.85)
+					      .from(".prayer-segments", { y: 26, opacity: 0, duration: 0.7 }, 1.0)
+					      .from("#nav-wrap", { y: 24, opacity: 0, duration: 0.6 }, 1.1);
+				} else {
+					gsap.from(".hero-reveal", {
+						y: 30, opacity: 0, duration: 0.8, stagger: 0.12, ease: "power3.out", delay: 0.5
+					});
+				}
 
 				// Cinematic camera: slow breathing drift + lerped mouse parallax.
 				// lookAt origin keeps the centered moon anchored while the camera
@@ -428,6 +446,15 @@ templ Scripts() {
 		}
 		function closeNav() { setNavOpen(false); }
 
+		// ---- Onboarding step switch ----
+		// Toggles data-step on the .onboarding container; CSS fades/slides
+		// the matching .onboarding-step in. No server round-trip.
+		function onboardingStep(n) {
+			var ob = document.querySelector('.onboarding');
+			if (!ob) return;
+			ob.setAttribute('data-step', String(n));
+		}
+
 		document.addEventListener('keydown', function(e) {
 			if (e.key === 'Escape') { closeDrawer(); closeNav(); }
 		});
@@ -435,6 +462,18 @@ templ Scripts() {
 		document.addEventListener('click', function(e) {
 			var wrap = document.getElementById('nav-wrap');
 			if (wrap && wrap.classList.contains('is-open') && !wrap.contains(e.target)) closeNav();
+		});
+
+		// ---- Surah transliteration disclosure ----
+		// Toggles aria-expanded on the .surah-disclosure-toggle button;
+		// CSS animates the content's grid-template-rows 0fr→1fr (60fps,
+		// no JS height measurement). Default collapsed so the Mulai CTA
+		// has proper breathing room on the welcome card.
+		document.addEventListener('click', function(e) {
+			var toggle = e.target.closest('.surah-disclosure-toggle');
+			if (!toggle) return;
+			var open = toggle.getAttribute('aria-expanded') === 'true';
+			toggle.setAttribute('aria-expanded', open ? 'false' : 'true');
 		});
 
 		// ---- Prayer picker segmented control ----
