@@ -127,33 +127,62 @@ templ IndexPage(data PageData) {
 }
 
 // LocationPicker — full-screen location setup when no cookie is set.
+// Mission-control console: eyebrow + title + scrollable tappable city rows
+// + live coordinate readout + confirm. Replaces the native <select> with a
+// console-instrument list that matches the viewfinder language. Each row
+// carries data-value (Name|Lat|Lng for the server) + data-lat/lng for the
+// live readout; selectCity() wires the selection to the hidden input and
+// coord display.
 templ LocationPicker(cities []City) {
-	<section class="hero-reveal mx-auto flex max-w-sm flex-1 flex-col items-center justify-center">
-		<div class="viewfinder-full w-full p-8">
+	<section class="hero-reveal mx-auto flex w-full max-w-md flex-1 flex-col items-center justify-center">
+		<div class="viewfinder-full w-full p-8 md:p-10">
 			<span class="vf-corner vf-tl"></span>
 			<span class="vf-corner vf-tr"></span>
 			<span class="vf-corner vf-bl"></span>
 			<span class="vf-corner vf-br"></span>
 
-			<h2 class="mb-6 text-center font-display text-lg font-bold tracking-wide text-fg">
-				PILIH LOKASI
+			<div class="mb-1.5 text-center font-mono text-[10px] tracking-[0.3em] uppercase text-accent">
+				SISTEM // LOKASI
+			</div>
+			<h2 class="mb-2 text-center font-display text-xl font-bold tracking-tight text-fg">
+				Pilih Lokasi
 			</h2>
+			<p class="mb-6 text-center font-mono text-[11px] tracking-wider text-fg-muted">
+				Pilih kota atau gunakan GPS
+			</p>
 
-			<form hx-post="/location" hx-swap="none" class="flex flex-col gap-4">
-				<label class="flex flex-col gap-1.5 text-[10px] tracking-[0.2em] uppercase text-fg-muted">
-					<span>Kota</span>
-					<select
-						name="city"
-						class="appearance-none rounded-none border border-border bg-surface px-3 py-2.5 font-mono text-sm text-fg focus:outline-1 focus:outline-accent"
-					>
-						for _, c := range cities {
-							<option value={ c.Name + "|" + fmtFloat(c.Lat, 6) + "|" + fmtFloat(c.Lng, 6) }>{ c.Name }</option>
-						}
-					</select>
-				</label>
+			<form hx-post="/location" hx-swap="none" id="city-form">
+				<input type="hidden" name="city" id="city-value"/>
+				<div class="city-list" role="listbox" aria-label="Pilih kota">
+					for _, c := range cities {
+						<button
+							type="button"
+							class="city-row"
+							role="option"
+							aria-pressed="false"
+							data-value={ c.Name + "|" + fmtFloat(c.Lat, 6) + "|" + fmtFloat(c.Lng, 6) }
+							data-lat={ fmtFloat(c.Lat, 6) }
+							data-lng={ fmtFloat(c.Lng, 6) }
+							onclick="selectCity(this)"
+						>
+							<span class="city-row-name">{ c.Name }</span>
+							<span class="city-row-marker" aria-hidden="true"></span>
+						</button>
+					}
+				</div>
+
+				<div class="coord-readout" aria-live="polite">
+					<span class="coord-label">LAT</span>
+					<span class="coord-value" id="coord-lat">--.------</span>
+					<span class="coord-label">LNG</span>
+					<span class="coord-value" id="coord-lng">--.------</span>
+				</div>
+
 				<button
 					type="submit"
-					class="rounded-none bg-fg px-5 py-2.5 font-mono text-xs font-medium tracking-[0.15em] uppercase text-bg transition-colors hover:bg-fg-muted"
+					class="city-confirm"
+					id="city-confirm"
+					disabled
 				>
 					Gunakan Kota
 				</button>

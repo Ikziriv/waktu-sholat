@@ -355,6 +355,25 @@ templ Scripts() {
 			evt.detail.parameters.tz = Intl.DateTimeFormat().resolvedOptions().timeZone;
 		});
 
+		// City picker — select a row, fill the hidden input + coordinate
+		// readout, enable the confirm button. One tappable list replaces
+		// the native <select>; the readout makes it read as an instrument.
+		function selectCity(btn) {
+			var rows = document.querySelectorAll('.city-row');
+			for (var i = 0; i < rows.length; i++) {
+				rows[i].setAttribute('aria-pressed', 'false');
+			}
+			btn.setAttribute('aria-pressed', 'true');
+			var input = document.getElementById('city-value');
+			if (input) input.value = btn.getAttribute('data-value');
+			var latEl = document.getElementById('coord-lat');
+			var lngEl = document.getElementById('coord-lng');
+			if (latEl) latEl.textContent = btn.getAttribute('data-lat');
+			if (lngEl) lngEl.textContent = btn.getAttribute('data-lng');
+			var confirm = document.getElementById('city-confirm');
+			if (confirm) confirm.disabled = false;
+		}
+
 		function toggleTheme() {
 			var html = document.documentElement;
 			var current = html.getAttribute('data-theme');
