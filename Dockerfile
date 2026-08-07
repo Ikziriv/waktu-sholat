@@ -9,10 +9,11 @@
 FROM node:22-bookworm-slim AS tailwind
 WORKDIR /src
 COPY . .
-# -p installs both packages: the CLI needs the `tailwindcss` package
-# resolvable to satisfy `@import "tailwindcss"` in input.css.
-RUN npx --yes -p tailwindcss@4 -p @tailwindcss/cli@4 \
-    @tailwindcss/cli -i input.css -o static/out.css --minify
+# Install locally so `@import "tailwindcss"` in input.css resolves from
+# /src/node_modules (Tailwind v4 resolves the import relative to the CSS
+# file, not npx's cache). @tailwindcss/cli's bin is named `tailwindcss`.
+RUN npm init -y && npm install tailwindcss@4 @tailwindcss/cli@4 \
+    && npx tailwindcss -i input.css -o static/out.css --minify
 
 # ---- build stage ----
 FROM golang:1.25-bookworm AS build
