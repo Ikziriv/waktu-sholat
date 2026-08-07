@@ -9,7 +9,10 @@
 FROM node:22-bookworm-slim AS tailwind
 WORKDIR /src
 COPY . .
-RUN npx --yes @tailwindcss/cli -i input.css -o static/out.css --minify
+# -p installs both packages: the CLI needs the `tailwindcss` package
+# resolvable to satisfy `@import "tailwindcss"` in input.css.
+RUN npx --yes -p tailwindcss@4 -p @tailwindcss/cli@4 \
+    @tailwindcss/cli -i input.css -o static/out.css --minify
 
 # ---- build stage ----
 FROM golang:1.25-bookworm AS build
