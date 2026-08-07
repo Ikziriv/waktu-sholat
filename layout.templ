@@ -1,0 +1,517 @@
+package main
+
+import "strconv"
+
+// Layout is the base HTML shell: head, 3D moon, theme toggle, drawer, scripts.
+// 21hrs.space aesthetic: pure black, warm bone text, monospace mission control.
+// Single hero screen (100dvh) — all content fits in one viewport, drawers for details.
+templ Layout(title string, content templ.Component) {
+	<!DOCTYPE html>
+	<html lang="id">
+	<head>
+		<meta charset="utf-8"/>
+		<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover"/>
+		<title>{ title }</title>
+		<link rel="stylesheet" href="/static/out.css"/>
+		<script src="https://unpkg.com/htmx.org@1.9.12" defer></script>
+		<script>
+			(function(){
+				try {
+					var t = localStorage.getItem('ws_theme');
+					if (t === 'light' || t === 'dark') {
+						document.documentElement.setAttribute('data-theme', t);
+					}
+				} catch (e) {}
+			})();
+		</script>
+	</head>
+	<body class="min-h-[100dvh] overflow-hidden antialiased">
+		@MoonCanvas()
+		@ThemeToggle()
+		<main class="relative z-10 flex min-h-[100dvh] flex-col px-6 py-6 md:px-10 md:py-8">
+			@content
+		</main>
+		@Drawer()
+		@Scripts()
+	</body>
+	</html>
+}
+
+// MoonCanvas — fixed full-screen Three.js moon + galaxy particle field.
+// Always renders (dimmer in light theme). Galaxy + star shell are dark-theme
+// only (additive blending is invisible on the cream light bg).
+// Respects prefers-reduced-motion (skips 3D entirely).
+templ MoonCanvas() {
+	<canvas id="moon-canvas" class="fixed inset-0 z-0 pointer-events-none opacity-0"></canvas>
+	<script type="importmap">
+		{
+			"imports": {
+				"three": "https://unpkg.com/three@0.159.0/build/three.module.js",
+				"gsap": "https://unpkg.com/gsap@3.12.5/index.js"
+			}
+		}
+	</script>
+	<script type="module">
+		(function() {
+			if (matchMedia('(prefers-reduced-motion: reduce)').matches) {
+				var c = document.getElementById('moon-canvas');
+				if (c) c.style.opacity = '0.15';
+				return;
+			}
+			var isDark = document.documentElement.getAttribute('data-theme') === 'dark' ||
+				(!document.documentElement.hasAttribute('data-theme') &&
+				 matchMedia('(prefers-color-scheme: dark)').matches);
+
+			Promise.all([
+				import('three'),
+				import('gsap')
+			]).then(function(modules) {
+				var THREE = modules[0];
+				var gsap = modules[1].default || modules[1];
+
+				var canvas = document.getElementById('moon-canvas');
+				if (!canvas) return;
+
+				// antialias only on low-DPI (invisible + costly on retina); cap
+				// pixel ratio at 1.5 — this is a background canvas, 2x renders 4x
+				// pixels for no visible gain. powerPreference picks the dGPU on
+				// dual-GPU laptops (common on macOS).
+				var dpr = Math.min(window.devicePixelRatio, 1.5);
+				var renderer = new THREE.WebGLRenderer({
+					canvas: canvas,
+					antialias: dpr < 2,
+					alpha: true,
+					powerPreference: 'high-performance'
+				});
+				renderer.setPixelRatio(dpr);
+				renderer.setSize(window.innerWidth, window.innerHeight);
+
+				var scene = new THREE.Scene();
+				var camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 100);
+				camera.position.z = 5;
+
+				// Moon — sphere with NASA moon texture
+				var loader = new THREE.TextureLoader();
+				loader.setCrossOrigin('anonymous');
+				// jsdelivr CDN (cached, compressed) — raw.githubusercontent.com
+				// sends no-cache headers so the texture re-downloads every visit.
+				var moonTex = loader.load('https://cdn.jsdelivr.net/gh/mrdoob/three.js@r159/examples/textures/planets/moon_1024.jpg');
+				var moonGeo = new THREE.SphereGeometry(1.9, 64, 64);
+				var moonMat = new THREE.MeshStandardMaterial({
+					map: moonTex,
+					roughness: 1,
+					metalness: 0,
+					emissive: new THREE.Color(isDark ? 0x1a1410 : 0x1a1d2e),
+					emissiveIntensity: 0.12
+				});
+				var moon = new THREE.Mesh(moonGeo, moonMat);
+				// Centered hero — pushed back in Z so it sits behind the content
+				// as a backdrop. At z=-2 (cam dist 7) the 1.9r sphere fills ~65%
+				// of viewport height: dominant but not overwhelming.
+				moon.position.set(0, 0, -2);
+				moon.rotation.z = 0.2;
+				// Responsive zoom: on portrait phones the visible width is much
+				// narrower than height (aspect < 1), so the fixed 3.8-unit moon
+				// overflows the sides. Scale by aspect so the moon always fits
+				// ~70% of visible width; capped at 1 so desktop is unchanged.
+				// GPU-side matrix scale — no layout cost, resize-safe.
+				function moonScaleFor(aspect) { return Math.min(1, 1.07 * aspect); }
+				var moonScale = moonScaleFor(camera.aspect);
+				moon.scale.set(moonScale, moonScale, moonScale);
+				scene.add(moon);
+
+				// Lighting — theme-aware. Dark: dim dramatic. Light: moderate so
+				// the grey moon reads against silver without washing out.
+				var ambient = new THREE.AmbientLight(0xfff3ea, isDark ? 0.2 : 0.5);
+				scene.add(ambient);
+				var dirLight = new THREE.DirectionalLight(0xfff3ea, isDark ? 0.7 : 0.4);
+				dirLight.position.set(-3, 2, 2);
+				scene.add(dirLight);
+
+				// Galaxy + background stars — both themes.
+				// Dark: additive blending (bright glowing particles on black).
+				// Light: normal blending (dark ink particles on silver — crisp,
+				// reliable across GPUs; subtractive produced muddy washed results).
+				var blend = isDark ? THREE.AdditiveBlending : THREE.NormalBlending;
+				var bgStarColor = isDark ? 0xfff3ea : 0x3a3a3c;
+
+				// Spiral disk: 3 arms, warm core fading to cool nebula rim.
+				// Light theme: dark navy/slate ink — reads as a constellation
+				// chart on silver, not a muddy smudge.
+				var galaxyCount = 2500;
+				var galaxyGeo = new THREE.BufferGeometry();
+				var gPos = new Float32Array(galaxyCount * 3);
+				var gCol = new Float32Array(galaxyCount * 3);
+				var maxR = 16, arms = 3;
+				var cInner = isDark ? new THREE.Color(0xfff3ea) : new THREE.Color(0x1a1d2e);
+				var cMid   = isDark ? new THREE.Color(0xe4b592) : new THREE.Color(0x2d3450);
+				var cOuter = isDark ? new THREE.Color(0x6b6398) : new THREE.Color(0x4a5278);
+				for (var i = 0; i < galaxyCount; i++) {
+					var r = Math.pow(Math.random(), 0.6) * maxR; // denser core
+					var arm = (i % arms) * (2 * Math.PI / arms);
+					var ang = arm + r * 0.35 + (Math.random() - 0.5) * 0.7;
+					var jit = (Math.random() - 0.5) * 1.8;
+					gPos[i*3]   = Math.cos(ang) * r + jit;
+					gPos[i*3+1] = (Math.random() - 0.5) * 1.4 * (1 - r/maxR); // thin disk
+					gPos[i*3+2] = Math.sin(ang) * r + jit;
+					var t = r / maxR;
+					var col = t < 0.5
+						? cInner.clone().lerp(cMid, t * 2)
+						: cMid.clone().lerp(cOuter, (t - 0.5) * 2);
+					gCol[i*3] = col.r; gCol[i*3+1] = col.g; gCol[i*3+2] = col.b;
+				}
+				galaxyGeo.setAttribute('position', new THREE.BufferAttribute(gPos, 3));
+				galaxyGeo.setAttribute('color', new THREE.BufferAttribute(gCol, 3));
+				var galaxyMat = new THREE.PointsMaterial({
+					size: 0.07, transparent: true, opacity: 0, vertexColors: true,
+					blending: blend, depthWrite: false, sizeAttenuation: true
+				});
+				var galaxy = new THREE.Points(galaxyGeo, galaxyMat);
+				galaxy.position.set(0, 0, -8);
+				galaxy.rotation.x = 0.35; // tilt to see the disk face
+				scene.add(galaxy);
+
+				// Background star shell — distant uniform sphere for depth.
+				// Custom shader: per-star twinkle (phase) + soft round points.
+				// GPU-side, costs nothing on the CPU vs animating 1500 points
+				// from JS each frame. uTime drives a sin twinkle per vertex.
+				var bgCount = 1500;
+				var bgGeo = new THREE.BufferGeometry();
+				var bPos = new Float32Array(bgCount * 3);
+				var bPhase = new Float32Array(bgCount);
+				var bSize = new Float32Array(bgCount);
+				for (var j = 0; j < bgCount; j++) {
+					var theta = Math.random() * Math.PI * 2;
+					var phi = Math.acos(2 * Math.random() - 1);
+					var rad = 30 + Math.random() * 10;
+					bPos[j*3]   = rad * Math.sin(phi) * Math.cos(theta);
+					bPos[j*3+1] = rad * Math.sin(phi) * Math.sin(theta);
+					bPos[j*3+2] = rad * Math.cos(phi);
+					bPhase[j] = Math.random();
+					bSize[j] = 1.0 + Math.random() * 2.5;
+				}
+				bgGeo.setAttribute('position', new THREE.BufferAttribute(bPos, 3));
+				bgGeo.setAttribute('aPhase', new THREE.BufferAttribute(bPhase, 1));
+				bgGeo.setAttribute('aSize', new THREE.BufferAttribute(bSize, 1));
+				var bgMat = new THREE.ShaderMaterial({
+					uniforms: {
+						uTime: { value: 0 },
+						uColor: { value: new THREE.Color(bgStarColor) },
+						uOpacity: { value: 0 }
+					},
+					vertexShader: [
+						'attribute float aPhase;',
+						'attribute float aSize;',
+						'uniform float uTime;',
+						'varying float vTwinkle;',
+						'void main() {',
+						'  vTwinkle = 0.5 + 0.5 * sin(uTime * 1.8 + aPhase * 6.2831);',
+						'  vec4 mv = modelViewMatrix * vec4(position, 1.0);',
+						'  gl_PointSize = aSize * (220.0 / -mv.z) * (0.4 + vTwinkle * 0.6);',
+						'  gl_Position = projectionMatrix * mv;',
+						'}'
+					].join('\n'),
+					fragmentShader: [
+						'uniform vec3 uColor;',
+						'uniform float uOpacity;',
+						'varying float vTwinkle;',
+						'void main() {',
+						'  vec2 c = gl_PointCoord - 0.5;',
+						'  float d = length(c);',
+						'  if (d > 0.5) discard;',
+						'  float core = smoothstep(0.5, 0.0, d);',
+						'  gl_FragColor = vec4(uColor, core * uOpacity * (0.25 + vTwinkle * 0.75));',
+						'}'
+					].join('\n'),
+					transparent: true,
+					blending: blend,
+					depthWrite: false
+				});
+				var bgStars = new THREE.Points(bgGeo, bgMat);
+				scene.add(bgStars);
+
+				// GSAP entrance — moon fades in, galaxy + stars twinkle on, content staggers.
+				// Light theme: lower opacity so dark ink particles stay subtle on silver.
+				var targetOpacity = isDark ? 1 : 0.7;
+				var galaxyTarget = isDark ? 0.85 : 0.45;
+				var bgTarget = isDark ? 0.55 : 0.3;
+				var tl = gsap.timeline({ defaults: { ease: "power3.out" } });
+				tl.to(canvas, { opacity: targetOpacity, duration: 2.5 })
+				  .from(moon.position, { y: -2.5, duration: 3, ease: "power2.out" }, 0)
+				  .from(moon.scale, { x: moonScale * 0.6, y: moonScale * 0.6, z: moonScale * 0.6, duration: 2.5, ease: "back.out(1.2)" }, 0)
+				  .to(galaxyMat, { opacity: galaxyTarget, duration: 1.8 }, "-=1.5")
+				  .to(bgMat.uniforms.uOpacity, { value: bgTarget, duration: 1.5 }, "-=1.2");
+
+				// GSAP content reveal — stagger hero elements.
+				// The bottom nav wrap carries .hero-reveal so it fades in with
+				// the rest; the inner .hero-nav is controlled by CSS collapse
+				// (no GSAP inline opacity here, which would fight the collapse).
+				gsap.from(".hero-reveal", {
+					y: 30, opacity: 0, duration: 0.8, stagger: 0.12, ease: "power3.out", delay: 0.5
+				});
+
+				// Cinematic camera: slow breathing drift + lerped mouse parallax.
+				// lookAt origin keeps the centered moon anchored while the camera
+				// orbits subtly — gives depth/parallax (stars shift, moon barely).
+				// Pointer target is lerped (0.04) so motion stays smooth, never 1:1.
+				var clock = new THREE.Clock();
+				var mouse = { x: 0, y: 0, tx: 0, ty: 0 };
+				window.addEventListener('pointermove', function(e) {
+					mouse.tx = (e.clientX / window.innerWidth - 0.5) * 2;
+					mouse.ty = (e.clientY / window.innerHeight - 0.5) * 2;
+				});
+
+				// Very slow moon rotation + galaxy drift + star twinkle + cam
+				var running = true;
+				function animate() {
+					if (!running) return;
+					requestAnimationFrame(animate);
+					var t = clock.getElapsedTime();
+					bgMat.uniforms.uTime.value = t;
+					mouse.x += (mouse.tx - mouse.x) * 0.04;
+					mouse.y += (mouse.ty - mouse.y) * 0.04;
+					camera.position.x = Math.sin(t * 0.08) * 0.4 + mouse.x * 0.6;
+					camera.position.y = Math.cos(t * 0.06) * 0.25 - mouse.y * 0.4;
+					camera.lookAt(0, 0, 0);
+					moon.rotation.y += 0.0006;
+					moon.material.emissiveIntensity = 0.12 + Math.sin(t * 0.5) * 0.04;
+					if (galaxy) galaxy.rotation.y += 0.00008;
+					if (bgStars) bgStars.rotation.y += 0.00002;
+					renderer.render(scene, camera);
+				}
+				animate();
+
+				// Pause when tab hidden
+				document.addEventListener('visibilitychange', function() {
+					if (document.hidden) {
+						running = false;
+					} else if (!running) {
+						running = true;
+						animate();
+					}
+				});
+
+				// Resize
+				window.addEventListener('resize', function() {
+					camera.aspect = window.innerWidth / window.innerHeight;
+					camera.updateProjectionMatrix();
+					renderer.setSize(window.innerWidth, window.innerHeight);
+					// Keep the moon fitted on rotation / orientation change.
+					var s = moonScaleFor(camera.aspect);
+					moon.scale.set(s, s, s);
+				});
+			}).catch(function(e) {
+				console.warn('moon load failed:', e);
+			});
+		})();
+	</script>
+}
+
+// ThemeToggle — glass island pill, top-right (safe-area aware). Both icons
+// stay visible; a sliding accent indicator eases between sun (light) and moon
+// (dark). --active (0=light, 1=dark) is set by syncThemeIcon() — same pattern
+// as the prayer-picker segmented control, so the two instruments share a
+// language. backdrop-blur gives the iOS control-center "floating glass" feel.
+templ ThemeToggle() {
+	<button
+		class="theme-toggle"
+		type="button"
+		aria-label="Ganti tema"
+		onclick="toggleTheme()"
+	>
+		<span class="theme-toggle-indicator" aria-hidden="true"></span>
+		<span class="theme-toggle-icon icon-sun" aria-hidden="true">☀</span>
+		<span class="theme-toggle-icon icon-moon" aria-hidden="true">☾</span>
+	</button>
+}
+
+// Drawer — persistent bottom sheet for niat, schedule, location.
+templ Drawer() {
+	<div class="drawer-backdrop" id="drawer-backdrop" onclick="closeDrawer()"></div>
+	<div class="drawer" id="drawer" role="dialog" aria-modal="true" aria-label="Detail">
+		<div id="drawer-body"></div>
+	</div>
+}
+
+// Scripts — GPS, theme toggle, drawer control, htmx config.
+templ Scripts() {
+	<script>
+		function useGPS(form) {
+			if (!navigator.geolocation) {
+				alert("Geolocation tidak didukung browser ini.");
+				return false;
+			}
+			navigator.geolocation.getCurrentPosition(function(pos) {
+				form.lat.value = pos.coords.latitude;
+				form.lng.value = pos.coords.longitude;
+				htmx.trigger(form, 'submit');
+			}, function(err) {
+				alert("Gagal mengambil lokasi: " + err.message);
+			});
+			return false;
+		}
+
+		document.body.addEventListener('htmx:configRequest', function(evt) {
+			evt.detail.parameters.tz = Intl.DateTimeFormat().resolvedOptions().timeZone;
+		});
+
+		function toggleTheme() {
+			var html = document.documentElement;
+			var current = html.getAttribute('data-theme');
+			var next;
+			if (current === 'light') next = 'dark';
+			else if (current === 'dark') next = 'light';
+			else next = (matchMedia('(prefers-color-scheme: dark)').matches) ? 'light' : 'dark';
+			html.setAttribute('data-theme', next);
+			try { localStorage.setItem('ws_theme', next); } catch (e) {}
+		}
+
+		function syncThemeIcon() {
+			var isDark = document.documentElement.getAttribute('data-theme') === 'dark' ||
+				(!document.documentElement.hasAttribute('data-theme') &&
+				 matchMedia('(prefers-color-scheme: dark)').matches);
+			var toggle = document.querySelector('.theme-toggle');
+			var moon = document.querySelector('.theme-toggle .icon-moon');
+			var sun = document.querySelector('.theme-toggle .icon-sun');
+			// --active drives the sliding indicator (0=light/sun, 1=dark/moon).
+			if (toggle) toggle.style.setProperty('--active', isDark ? '1' : '0');
+			if (moon) { moon.classList.toggle('is-active', isDark); moon.classList.toggle('is-inactive', !isDark); }
+			if (sun)  { sun.classList.toggle('is-active', !isDark); sun.classList.toggle('is-inactive', isDark); }
+		}
+		syncThemeIcon();
+		matchMedia('(prefers-color-scheme: dark)').addEventListener('change', syncThemeIcon);
+
+		function openDrawer() {
+			document.getElementById('drawer').classList.add('is-open');
+			document.getElementById('drawer-backdrop').classList.add('is-open');
+			document.body.style.overflow = 'hidden';
+		}
+		function closeDrawer() {
+			document.getElementById('drawer').classList.remove('is-open');
+			document.getElementById('drawer-backdrop').classList.remove('is-open');
+			document.body.style.overflow = '';
+		}
+
+		// On-demand bottom nav: a single + trigger expands the nav inline.
+		function setNavOpen(open) {
+			var wrap = document.getElementById('nav-wrap');
+			if (!wrap) return;
+			var btn = wrap.querySelector('.hero-nav-trigger');
+			if (open) wrap.classList.add('is-open'); else wrap.classList.remove('is-open');
+			if (btn) {
+				btn.setAttribute('aria-expanded', open ? 'true' : 'false');
+				btn.setAttribute('aria-label', open ? 'Tutup menu' : 'Buka menu');
+			}
+		}
+		function toggleNav() {
+			var wrap = document.getElementById('nav-wrap');
+			if (wrap) setNavOpen(!wrap.classList.contains('is-open'));
+		}
+		function closeNav() { setNavOpen(false); }
+
+		document.addEventListener('keydown', function(e) {
+			if (e.key === 'Escape') { closeDrawer(); closeNav(); }
+		});
+		// Collapse nav when clicking outside of it.
+		document.addEventListener('click', function(e) {
+			var wrap = document.getElementById('nav-wrap');
+			if (wrap && wrap.classList.contains('is-open') && !wrap.contains(e.target)) closeNav();
+		});
+
+		// ---- Prayer picker segmented control ----
+		// 5 tappable segments (Subuh..Isya). Clicking a segment eases the
+		// accent underline indicator to it (--active on #prayer-picker) and
+		// updates #next-prayer-* with that prayer's name, time, and a live
+		// countdown. A 1s interval keeps the countdown fresh.
+		function prayerStops() {
+			return document.querySelectorAll('[data-idx]');
+		}
+
+		function setPrayerPicker(idx) {
+			pickPrayer(idx);
+		}
+
+		function pickPrayer(idx) {
+			idx = parseInt(idx, 10);
+			var stops = prayerStops();
+			var stop = stops[idx];
+			if (!stop) return;
+
+			var label = stop.getAttribute('data-label');
+			var iso = stop.getAttribute('data-iso');
+
+			var nameEl = document.getElementById('next-prayer-name');
+			if (nameEl) nameEl.textContent = label;
+
+			stops.forEach(function(s, i) {
+				s.classList.toggle('text-accent', i === idx);
+				s.classList.toggle('text-fg-dim', i !== idx);
+				s.setAttribute('aria-pressed', i === idx ? 'true' : 'false');
+			});
+
+			var picker = document.getElementById('prayer-picker');
+			if (picker) {
+				picker.style.setProperty('--active', idx);
+				picker.setAttribute('data-active', String(idx));
+			}
+
+			updatePrayerCountdown(iso);
+		}
+
+		function updatePrayerCountdown(iso) {
+			var cdEl = document.getElementById('next-prayer-countdown');
+			var labelEl = document.getElementById('next-prayer-label');
+			if (!cdEl) return;
+			var target = new Date(iso);
+			var now = new Date();
+			var diffMs = target - now;
+			var absMs = Math.abs(diffMs);
+			var h = Math.floor(absMs / 3600000);
+			var m = Math.floor((absMs % 3600000) / 60000);
+			var text;
+			if (absMs < 60000) {
+				text = 'sekarang';
+			} else if (h === 0) {
+				text = m + ' mnt';
+			} else if (m === 0) {
+				text = h + ' jam';
+			} else {
+				text = h + ' jam ' + m + ' mnt';
+			}
+			if (diffMs > 0) {
+				text = 'dalam ' + text;
+				if (labelEl) labelEl.textContent = 'sholat berikutnya';
+			} else {
+				text = text + ' lalu';
+				if (labelEl) labelEl.textContent = 'sholat';
+			}
+			cdEl.textContent = text;
+		}
+
+		// Initialize picker + start 1s countdown refresh.
+		(function() {
+			var picker = document.getElementById('prayer-picker');
+			if (!picker) return;
+			pickPrayer(picker.getAttribute('data-active') || '0');
+
+			// Click any segment to jump to that prayer.
+			document.addEventListener('click', function(e) {
+				var stop = e.target.closest('.prayer-segment');
+				if (!stop) return;
+				setPrayerPicker(stop.getAttribute('data-idx'));
+			});
+
+			setInterval(function() {
+				var p = document.getElementById('prayer-picker');
+				if (!p) return;
+				var stops = prayerStops();
+				var stop = stops[parseInt(p.getAttribute('data-active'), 10)];
+				if (stop) updatePrayerCountdown(stop.getAttribute('data-iso'));
+			}, 1000);
+		})();
+	</script>
+}
+
+func fmtFloat(f float64, prec int) string {
+	return strconv.FormatFloat(f, 'f', prec, 64)
+}

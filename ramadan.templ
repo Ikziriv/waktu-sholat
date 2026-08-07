@@ -1,0 +1,99 @@
+package main
+
+import "fmt"
+
+// RamadanSection — full Ramadhan drawer: year selector + scrollable daily
+// list of Imsak + five prayers, today highlighted. Same shell as ScheduleSection.
+templ RamadanSection(info RamadanInfo) {
+	<div class="p-6 md:p-8">
+		<div class="flex items-center justify-between border-b border-border pb-4">
+			<div>
+				<span class="block text-[10px] tracking-[0.3em] uppercase text-fg-dim">Ramadhan</span>
+				if info.HijriYear > 0 {
+					<h2 class="font-display text-xl font-bold tracking-tight text-fg">{ fmt.Sprintf("%dH", info.HijriYear) }</h2>
+				} else {
+					<h2 class="font-display text-xl font-bold tracking-tight text-fg">Jadwal Puasa</h2>
+				}
+			</div>
+			<button
+				class="grid h-8 w-8 place-items-center rounded-full border border-border text-fg-muted transition-colors hover:text-fg hover:border-fg-muted"
+				onclick="closeDrawer()"
+				aria-label="Tutup"
+			>
+				✕
+			</button>
+		</div>
+
+		// Year selector — lookahead. htmx swaps this same partial on change.
+		<form class="mt-5 flex items-center gap-2" hx-get="/partials/ramadan" hx-target="#drawer-body" hx-swap="innerHTML">
+			<span class="text-[10px] tracking-[0.2em] uppercase text-fg-dim">Tahun</span>
+			<select
+				name="year"
+				onchange="this.form.submit()"
+				class="appearance-none rounded-none border border-border bg-surface px-2 py-1 font-mono text-[11px] text-fg focus:outline-1 focus:outline-accent"
+			>
+				for _, y := range info.Years {
+					if y == info.Year {
+						<option value={ fmt.Sprintf("%d", y) } selected>{ fmt.Sprintf("%d", y) }</option>
+					} else {
+						<option value={ fmt.Sprintf("%d", y) }>{ fmt.Sprintf("%d", y) }</option>
+					}
+				}
+			</select>
+		</form>
+
+		if len(info.Days) > 0 {
+			<p class="mt-4 font-mono text-[11px] text-fg-muted">
+				<span class="text-accent">●</span>
+				{" "}
+				{ info.Start.Format("2 Jan") } — { info.End.Format("2 Jan 2006") }
+				{" · "}
+				{ fmt.Sprintf("%d hari", len(info.Days)) }
+			</p>
+
+			<ul class="mt-4 list-none max-h-[60dvh] overflow-y-auto">
+				for i, d := range info.Days {
+					@RamadanDayRow(d, i == info.TodayIdx)
+				}
+			</ul>
+		} else {
+			<p class="py-4 font-mono text-xs text-fg-dim">Jadwal Ramadhan tidak tersedia. Pilih lokasi dulu.</p>
+		}
+
+		<button
+			class="mt-6 w-full rounded-none border border-border bg-transparent px-5 py-2.5 font-mono text-xs font-medium tracking-[0.15em] uppercase text-fg-muted transition-colors hover:border-fg-muted hover:text-fg"
+			onclick="closeDrawer()"
+		>
+			tutup
+		</button>
+	</div>
+}
+
+// RamadanDayRow — one day: Hijri day + Gregorian date on the left, the six
+// times in a compact grid on the right. Imsak and Maghrib (fasting bounds)
+// are accented; today is highlighted with the existing prayer-row--next style.
+templ RamadanDayRow(d RamadanDay, isToday bool) {
+	<li class={ "border-b border-border-2 py-3" + ramadanTodayClass(isToday) }>
+		<div class="flex items-baseline justify-between gap-3">
+			<div class="flex flex-col">
+				<span class="font-mono text-sm font-medium text-fg">{ fmt.Sprintf("%d Ramadhan", d.HijriDay) }</span>
+				<span class="font-mono text-[10px] tracking-[0.15em] uppercase text-fg-dim">{ d.Gregorian.Format("2 Jan 2006 · Mon") }</span>
+			</div>
+			<div class="grid grid-cols-2 gap-x-4 gap-y-0.5 text-right font-mono text-[11px] tabular-nums">
+				<span class="text-accent">Imsak<span class="ml-1.5 text-fg">{ d.Imsak.Format("15:04") }</span></span>
+				<span class="text-fg-muted">Subuh<span class="ml-1.5 text-fg">{ d.Subuh.Format("15:04") }</span></span>
+				<span class="text-fg-muted">Zuhur<span class="ml-1.5 text-fg">{ d.Zuhur.Format("15:04") }</span></span>
+				<span class="text-fg-muted">Ashar<span class="ml-1.5 text-fg">{ d.Ashar.Format("15:04") }</span></span>
+				<span class="text-accent">Maghrib<span class="ml-1.5 text-fg">{ d.Maghrib.Format("15:04") }</span></span>
+				<span class="text-fg-muted">Isya<span class="ml-1.5 text-fg">{ d.Isya.Format("15:04") }</span></span>
+			</div>
+		</div>
+	</li>
+}
+
+func ramadanTodayClass(isToday bool) string {
+	if isToday {
+		return " prayer-row--next -mx-2 px-2"
+	}
+	return ""
+}

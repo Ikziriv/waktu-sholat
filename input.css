@@ -1,0 +1,522 @@
+@import url("https://fonts.googleapis.com/css2?family=Amiri:ital,wght@0,400;0,700;1,400&family=JetBrains+Mono:ital,wght@0,300;0,400;0,500;0,700;1,400&family=Poppins:wght@600;700;800&display=swap");
+@import "tailwindcss";
+
+/* waktu-sholat — 21hrs.space-inspired design system
+   Pure black canvas, warm bone text, monospace mission-control aesthetic.
+   Fonts: JetBrains Mono (UI/data, like AkkuratMonoLL), Poppins (titles, like FuturaStd),
+   Amiri (Arabic niat only).
+   Colors extracted from 21hrs.space CSS variables. */
+
+@theme {
+  --font-mono: "JetBrains Mono", "SF Mono", monospace;
+  --font-display: "Poppins", "Futura", sans-serif;
+  --font-arabic: "Amiri", "Scheherazade New", serif;
+
+  /* Dark theme (default) — matches 21hrs.space exactly */
+  --color-bg: #000000;
+  --color-surface: #0a0a0a;
+  --color-surface-2: #141414;
+  --color-border: rgba(255, 243, 234, 0.1);
+  --color-border-2: rgba(255, 243, 234, 0.06);
+  --color-fg: #fff3ea;
+  --color-fg-muted: #dad0c8;
+  --color-fg-dim: rgba(255, 243, 234, 0.4);
+  --color-accent: #e4b592;
+  --color-accent-2: #c4956b;
+  --color-accent-soft: rgba(228, 181, 146, 0.08);
+  --color-pop: #ee1212;
+  --color-pop-soft: rgba(238, 18, 18, 0.1);
+  --color-shadow: rgba(0, 0, 0, 0.6);
+}
+
+/* ---- Light theme — silver canvas, dark ink particles, warm accent ---- */
+:root[data-theme="light"] {
+  --color-bg: #f5f5f7;
+  --color-surface: #ffffff;
+  --color-surface-2: #ebebed;
+  --color-border: rgba(0, 0, 0, 0.1);
+  --color-border-2: rgba(0, 0, 0, 0.06);
+  --color-fg: #1d1d1f;
+  --color-fg-muted: #6e6e73;
+  --color-fg-dim: rgba(29, 29, 31, 0.4);
+  --color-accent: #b07845;
+  --color-accent-2: #8a5d33;
+  --color-accent-soft: rgba(176, 120, 69, 0.12);
+  --color-pop: #c41e1e;
+  --color-pop-soft: rgba(196, 30, 30, 0.08);
+  --color-shadow: rgba(0, 0, 0, 0.08);
+}
+
+/* ---- System dark preference ---- */
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --color-bg: #000000;
+    --color-surface: #0a0a0a;
+    --color-surface-2: #141414;
+    --color-border: rgba(255, 243, 234, 0.1);
+    --color-border-2: rgba(255, 243, 234, 0.06);
+    --color-fg: #fff3ea;
+    --color-fg-muted: #dad0c8;
+    --color-fg-dim: rgba(255, 243, 234, 0.4);
+    --color-accent: #e4b592;
+    --color-accent-2: #c4956b;
+    --color-accent-soft: rgba(228, 181, 146, 0.08);
+    --color-pop: #ee1212;
+    --color-pop-soft: rgba(238, 18, 18, 0.1);
+    --color-shadow: rgba(0, 0, 0, 0.6);
+  }
+}
+
+/* ---- System light preference ---- */
+@media (prefers-color-scheme: light) {
+  :root:not([data-theme="dark"]) {
+    --color-bg: #f5f5f7;
+    --color-surface: #ffffff;
+    --color-surface-2: #ebebed;
+    --color-border: rgba(0, 0, 0, 0.1);
+    --color-border-2: rgba(0, 0, 0, 0.06);
+    --color-fg: #1d1d1f;
+    --color-fg-muted: #6e6e73;
+    --color-fg-dim: rgba(29, 29, 31, 0.4);
+    --color-accent: #b07845;
+    --color-accent-2: #8a5d33;
+    --color-accent-soft: rgba(176, 120, 69, 0.12);
+    --color-pop: #c41e1e;
+    --color-pop-soft: rgba(196, 30, 30, 0.08);
+    --color-shadow: rgba(0, 0, 0, 0.08);
+  }
+}
+
+/* ---- Base layer ---- */
+@layer base {
+  body {
+    background-color: var(--color-bg);
+    color: var(--color-fg);
+    font-family: var(--font-mono);
+    font-weight: 300;
+    letter-spacing: 0.01em;
+    transition: background-color 0.3s ease, color 0.3s ease;
+  }
+
+  /* Subtle star field background for dark theme */
+  :root[data-theme="dark"] body,
+  :root:not([data-theme="light"]) body {
+    background-image:
+      radial-gradient(1px 1px at 20% 30%, rgba(255, 243, 234, 0.15), transparent),
+      radial-gradient(1px 1px at 60% 70%, rgba(255, 243, 234, 0.1), transparent),
+      radial-gradient(1px 1px at 80% 20%, rgba(255, 243, 234, 0.08), transparent),
+      radial-gradient(1px 1px at 40% 80%, rgba(255, 243, 234, 0.12), transparent),
+      radial-gradient(1px 1px at 90% 50%, rgba(255, 243, 234, 0.06), transparent);
+    background-size: 200px 200px, 250px 250px, 180px 180px, 220px 220px, 300px 300px;
+  }
+
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) body {
+      background-image:
+        radial-gradient(1px 1px at 20% 30%, rgba(255, 243, 234, 0.15), transparent),
+        radial-gradient(1px 1px at 60% 70%, rgba(255, 243, 234, 0.1), transparent),
+        radial-gradient(1px 1px at 80% 20%, rgba(255, 243, 234, 0.08), transparent),
+        radial-gradient(1px 1px at 40% 80%, rgba(255, 243, 234, 0.12), transparent),
+        radial-gradient(1px 1px at 90% 50%, rgba(255, 243, 234, 0.06), transparent);
+      background-size: 200px 200px, 250px 250px, 180px 180px, 220px 220px, 300px 300px;
+    }
+  }
+
+  /* Static ink-dot field for light theme — fallback texture when the 3D
+     canvas is disabled (reduced motion) or hasn't loaded yet. Mirrors the
+     dark theme star field but with dark dots on silver. */
+  :root[data-theme="light"] body {
+    background-image:
+      radial-gradient(1px 1px at 20% 30%, rgba(29, 29, 31, 0.12), transparent),
+      radial-gradient(1px 1px at 60% 70%, rgba(29, 29, 31, 0.08), transparent),
+      radial-gradient(1px 1px at 80% 20%, rgba(29, 29, 31, 0.06), transparent),
+      radial-gradient(1px 1px at 40% 80%, rgba(29, 29, 31, 0.1), transparent),
+      radial-gradient(1px 1px at 90% 50%, rgba(29, 29, 31, 0.05), transparent);
+    background-size: 200px 200px, 250px 250px, 180px 180px, 220px 220px, 300px 300px;
+  }
+
+  @media (prefers-color-scheme: light) {
+    :root:not([data-theme="dark"]) body {
+      background-image:
+        radial-gradient(1px 1px at 20% 30%, rgba(29, 29, 31, 0.12), transparent),
+        radial-gradient(1px 1px at 60% 70%, rgba(29, 29, 31, 0.08), transparent),
+        radial-gradient(1px 1px at 80% 20%, rgba(29, 29, 31, 0.06), transparent),
+        radial-gradient(1px 1px at 40% 80%, rgba(29, 29, 31, 0.1), transparent),
+        radial-gradient(1px 1px at 90% 50%, rgba(29, 29, 31, 0.05), transparent);
+      background-size: 200px 200px, 250px 250px, 180px 180px, 220px 220px, 300px 300px;
+    }
+  }
+}
+
+/* ---- Component layer: viewfinder, drawer, compass ---- */
+@layer components {
+  /* Viewfinder frame corners — the signature 21hrs.space element.
+     Four L-shaped corners that frame content like a camera viewfinder. */
+  .viewfinder {
+    position: relative;
+  }
+  .viewfinder::before,
+  .viewfinder::after {
+    content: "";
+    position: absolute;
+    width: 16px;
+    height: 16px;
+    border-color: var(--color-accent);
+    pointer-events: none;
+  }
+  .viewfinder::before {
+    top: 0;
+    left: 0;
+    border-top: 1px solid;
+    border-left: 1px solid;
+  }
+  .viewfinder::after {
+    bottom: 0;
+    right: 0;
+    border-bottom: 1px solid;
+    border-right: 1px solid;
+  }
+
+  /* Full viewfinder with all 4 corners (use inner spans for the other 2) */
+  .viewfinder-full {
+    position: relative;
+    z-index: 0; /* stacking context so ::before z-index works */
+  }
+
+  /* Eclipse backdrop — dims + blurs the 3D moon behind the compass so the
+     thin SVG lines read clearly. backdrop-filter is GPU-composited (zero
+     CPU cost). The darkened circle against the bright moon creates the
+     "inverted" visual: bright moon → dark behind compass. */
+  .viewfinder-full::before {
+    content: "";
+    position: absolute;
+    inset: 6%;
+    border-radius: 50%;
+    backdrop-filter: brightness(0.3) blur(2px);
+    -webkit-backdrop-filter: brightness(0.3) blur(2px);
+    box-shadow: inset 0 0 24px rgba(0,0,0,0.5);
+    z-index: -1;
+    pointer-events: none;
+  }
+
+  /* Compass instrument — dark depth shadow only (keeps fine ticks crisp
+     against the eclipsed moon). Accent glow is applied per-element on the
+     needle and qibla marker so the thin tick/numeral lines stay sharp. */
+  .compass-dial {
+    filter: drop-shadow(0 1px 4px rgba(0,0,0,0.9));
+  }
+  .compass-needle {
+    filter: drop-shadow(0 0 3px var(--color-accent-soft));
+  }
+  .qibla-marker {
+    filter: drop-shadow(0 0 4px var(--color-accent-soft));
+  }
+  .vf-corner {
+    position: absolute;
+    width: 16px;
+    height: 16px;
+    border-color: var(--color-accent);
+    pointer-events: none;
+  }
+  .vf-tl { top: 0; left: 0; border-top: 1px solid; border-left: 1px solid; }
+  .vf-tr { top: 0; right: 0; border-top: 1px solid; border-right: 1px solid; }
+  .vf-bl { bottom: 0; left: 0; border-bottom: 1px solid; border-left: 1px solid; }
+  .vf-br { bottom: 0; right: 0; border-bottom: 1px solid; border-right: 1px solid; }
+
+  /* Bottom drawer for niat sholat */
+  .drawer-backdrop {
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.7);
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.4s cubic-bezier(0.22, 1, 0.36, 1);
+    z-index: 40;
+  }
+  .drawer-backdrop.is-open {
+    opacity: 1;
+    pointer-events: auto;
+  }
+
+  .drawer {
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    max-height: 80vh;
+    overflow-y: auto;
+    background: var(--color-surface);
+    border-top: 1px solid var(--color-border);
+    transform: translateY(100%);
+    transition: transform 0.4s cubic-bezier(0.22, 1, 0.36, 1);
+    z-index: 50;
+  }
+  .drawer.is-open {
+    transform: translateY(0);
+  }
+
+  @media (min-width: 768px) {
+    .drawer {
+      left: 50%;
+      right: auto;
+      width: 520px;
+      max-width: 90vw;
+      transform: translate(-50%, 100%);
+      border: 1px solid var(--color-border);
+      border-bottom: none;
+    }
+    .drawer.is-open {
+      transform: translate(-50%, 0);
+    }
+  }
+
+  /* Compass needle + qibla marker — rotate around the SVG center (viewBox
+     100,100). transform-box: view-box makes transform-origin use viewBox
+     coordinates so both elements pivot on the instrument center regardless
+     of their own bounding box. */
+  .compass-needle,
+  .qibla-marker {
+    transform-box: view-box;
+    transform-origin: 100px 100px;
+    transition: transform 1s cubic-bezier(0.34, 1.4, 0.64, 1);
+  }
+
+  /* Needle spring-settle on load — sweeps in from 50° behind the bearing and
+     settles with a slight gyro overshoot. --bearing is set inline per dial.
+     GPU-safe: animates transform only. */
+  .compass-needle {
+    animation: compass-settle 1.8s cubic-bezier(0.34, 1.4, 0.64, 1) both;
+  }
+  @keyframes compass-settle {
+    from { transform: rotate(calc(var(--bearing, 0deg) - 50deg)); }
+  }
+
+  /* Qibla marker — slow ambient pulse so the direction stays alive without
+     distracting. Opacity-only, compositor-cheap. */
+  .qibla-marker {
+    animation: qibla-pulse 4s ease-in-out infinite;
+  }
+  @keyframes qibla-pulse {
+    0%, 100% { opacity: 0.8; }
+    50% { opacity: 1; }
+  }
+
+  /* Next prayer highlight — red pop color like 21hrs.space alerts */
+  .prayer-row--next {
+    background: var(--color-pop-soft);
+    border-left: 2px solid var(--color-pop);
+  }
+
+  /* Scanline / mission control terminal effect for clock */
+  .terminal-glow {
+    text-shadow: 0 0 20px var(--color-accent-soft);
+  }
+
+  /* On-demand expanding nav — collapsed to a single + trigger,
+     expands inline on click. Desktop: centered pill widened to fit
+     all 5 items. Mobile (<768px): horizontally scrollable snap strip
+     with fade edges — native touch momentum, no JS, compositor-only. */
+  .hero-nav {
+    max-width: 0;
+    opacity: 0;
+    overflow: hidden;
+    pointer-events: none;
+    white-space: nowrap;
+    transition: max-width .35s cubic-bezier(.22,1,.36,1), opacity .25s ease;
+  }
+  .hero-nav-wrap.is-open .hero-nav {
+    opacity: 1;
+    pointer-events: auto;
+  }
+  .hero-nav-trigger {
+    transition: transform .35s cubic-bezier(.22,1,.36,1), color .2s, border-color .2s;
+  }
+  .hero-nav-wrap.is-open .hero-nav-trigger {
+    transform: rotate(45deg);
+  }
+
+  /* Desktop (>=768px): inline pill. 440px fits all 5 items comfortably
+     (was 320px, sized for the original 3 — Ramadhan + Lokasi overflowed). */
+  @media (min-width: 768px) {
+    .hero-nav-wrap.is-open .hero-nav {
+      max-width: 440px;
+    }
+  }
+
+  /* Mobile (<768px): scroll-snap strip. overflow-x:auto enables native
+     touch scrolling (compositor, 60fps); scroll-snap centers each item.
+     flex:none on buttons prevents shrinking so they overflow to scroll.
+     mask-image fades both edges to signal more content off-screen. */
+  @media (max-width: 767px) {
+    .hero-nav-wrap.is-open .hero-nav {
+      max-width: calc(100vw - 4rem);
+      overflow-x: auto;
+      overflow-y: hidden;
+      scroll-snap-type: x mandatory;
+      -webkit-overflow-scrolling: touch;
+      scrollbar-width: none;
+      -webkit-mask-image: linear-gradient(to right, transparent, #000 1.25rem, #000 calc(100% - 1.25rem), transparent);
+      mask-image: linear-gradient(to right, transparent, #000 1.25rem, #000 calc(100% - 1.25rem), transparent);
+    }
+    .hero-nav::-webkit-scrollbar { display: none; }
+    .hero-nav > button {
+      flex: none;
+      scroll-snap-align: center;
+    }
+  }
+
+  /* Prayer picker — segmented control with a sliding accent underline.
+     One row of equal-width tappable segments; each segment stacks the
+     prayer name over its time (at-a-glance schedule). A 2px accent
+     underline eases between segments on --active (GPU transform only,
+     60fps). --count drives segment/indicator width, --active drives the
+     indicator position via translateX (relative to the indicator's own
+     width, so N*100% lands on the Nth segment). */
+  .prayer-segments {
+    position: relative;
+    border: 1px solid var(--color-border);
+    background: var(--color-surface);
+    overflow: hidden;
+  }
+  .prayer-indicator {
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    height: 2px;
+    width: calc(100% / var(--count, 5));
+    background: var(--color-accent);
+    transform: translateX(calc(var(--active, 0) * 100%));
+    transition: transform 0.4s cubic-bezier(0.22, 1, 0.36, 1);
+    pointer-events: none;
+    will-change: transform;
+  }
+  .prayer-segment {
+    flex: 1 1 0;
+    min-height: 48px;
+    padding: 0.7rem 0.25rem;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 0.25rem;
+    background: transparent;
+    border: none;
+    border-right: 1px solid var(--color-border-2);
+    cursor: pointer;
+    position: relative;
+    z-index: 1;
+    transition: color 0.2s ease;
+  }
+  .prayer-segment:last-child {
+    border-right: none;
+  }
+  .prayer-segment-name {
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.2em;
+    line-height: 1;
+  }
+  .prayer-segment-time {
+    font-size: 10px;
+    font-variant-numeric: tabular-nums;
+    letter-spacing: 0.04em;
+    line-height: 1;
+    opacity: 0.5;
+    transition: opacity 0.2s ease;
+  }
+  .prayer-segment:hover .prayer-segment-time {
+    opacity: 0.8;
+  }
+  .prayer-segment[aria-pressed="true"] .prayer-segment-time {
+    opacity: 1;
+  }
+
+  /* Theme toggle — glass island pill, top-right. Both icons always visible;
+     a sliding accent indicator eases between sun (light, left) and moon
+     (dark, right). --active (0/1) is set on the button by syncThemeIcon().
+     Indicator travel = its own width (icons sit flush, gap:0), so
+     translateX(100%) lands exactly on the second slot — same math as the
+     prayer-picker. backdrop-blur gives the floating-glass control-center
+     feel; safe-area insets clear the notch on mobile. */
+  .theme-toggle {
+    position: fixed;
+    top: calc(env(safe-area-inset-top, 0px) + 1rem);
+    right: calc(env(safe-area-inset-right, 0px) + 1rem);
+    z-index: 30;
+    display: inline-flex;
+    align-items: center;
+    gap: 0;
+    padding: 0.1875rem;
+    border-radius: 9999px;
+    border: 1px solid var(--color-border);
+    background: color-mix(in srgb, var(--color-surface) 55%, transparent);
+    backdrop-filter: blur(14px) saturate(140%);
+    -webkit-backdrop-filter: blur(14px) saturate(140%);
+    cursor: pointer;
+    transition: border-color 0.25s ease, background-color 0.3s ease, transform 0.1s ease;
+  }
+  .theme-toggle:hover { border-color: var(--color-fg-muted); }
+  .theme-toggle:active { transform: scale(0.96); }
+
+  .theme-toggle-icon {
+    position: relative;
+    z-index: 1;
+    display: grid;
+    place-items: center;
+    width: 1.625rem;
+    height: 1.625rem;
+    border-radius: 9999px;
+    font-size: 0.8125rem;
+    line-height: 1;
+    color: var(--color-fg-dim);
+    transition: color 0.3s ease;
+  }
+  .theme-toggle-icon.is-active { color: var(--color-fg); }
+
+  .theme-toggle-indicator {
+    position: absolute;
+    top: 0.1875rem;
+    left: 0.1875rem;
+    width: 1.625rem;
+    height: 1.625rem;
+    border-radius: 9999px;
+    background: var(--color-accent-soft);
+    box-shadow: inset 0 0 0 1px var(--color-accent);
+    transform: translateX(calc(var(--active, 0) * 100%));
+    transition: transform 0.4s cubic-bezier(0.22, 1, 0.36, 1);
+    pointer-events: none;
+    will-change: transform;
+  }
+}
+
+/* ---- Reduced motion ---- */
+@media (prefers-reduced-motion: reduce) {
+  .drawer,
+  .drawer-backdrop,
+  .compass-needle,
+  .qibla-marker,
+  .prayer-indicator,
+  .theme-toggle-indicator,
+  .theme-toggle,
+  body {
+    transition: none !important;
+  }
+  .compass-needle,
+  .qibla-marker {
+    animation: none !important;
+  }
+}
+
+/* ---- Print ---- */
+@media print {
+  :root {
+    --color-bg: #fff;
+    --color-surface: #fff;
+    --color-border: #ccc;
+    --color-fg: #000;
+    --color-fg-muted: #444;
+    --color-accent: #555;
+  }
+  body { background: #fff; }
+  .theme-toggle, .where-reset, .method-pick, .niat-close { display: none; }
+}

@@ -1,0 +1,18 @@
+{
+  "$schema": "https://wails.io/schema.json",
+  "name": "waktu-sholat",
+  "outputfilename": "waktu-sholat",
+  "frontend:install": "",
+  "frontend:build": "",
+  "frontend:dev:watcher": "",
+  "frontend:dev:serverUrl": "",
+  "author": {
+    "name": "waktu-sholat"
+  },
+  "info": {
+    "productName": "Waktu Sholat",
+    "productVersion": "1.0.0",
+    "copyright": "Copyright © 2026",
+    "comments": "Prayer times, qibla direction, and niat sholat"
+  }
+}

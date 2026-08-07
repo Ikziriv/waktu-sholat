@@ -1,0 +1,11 @@
+{
+  "build": {
+    "builder": "DOCKERFILE",
+    "dockerfilePath": "Dockerfile"
+  },
+  "deploy": {
+    "startCommand": "./waktu-sholat",
+    "healthcheckPath": "/",
+    "healthcheckTimeout": 100
+  }
+}

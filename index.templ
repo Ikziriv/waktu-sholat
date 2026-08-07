@@ -1,0 +1,439 @@
+package main
+
+import "fmt"
+
+// IndexPage — single hero screen (100dvh).
+// Shows only the 3 essentials: time (clock), next prayer (sholat), qibla (kiblat).
+// Everything else (full schedule, niat, location picker, method) opens in drawers.
+templ IndexPage(data PageData) {
+	if !data.HasLocation {
+		@LocationPicker(data.Cities)
+	} else {
+		// Top bar — title + location badge (click to open location drawer)
+		<div class="hidden items-center justify-between md:flex">
+			<h1 class="font-display text-sm font-extrabold tracking-[0.2em] text-fg uppercase">
+				Waktu Sholat
+			</h1>
+			<button
+				class="flex items-center gap-2 font-mono text-[11px] tracking-wider text-fg-muted transition-colors hover:text-accent"
+				hx-get="/partials/location"
+				hx-target="#drawer-body"
+				hx-swap="innerHTML"
+				hx-on::after-request="openDrawer()"
+			>
+				<span class="text-accent">
+					if data.CityName != "" {
+						{ data.CityName }
+					} else {
+						GPS
+					}
+				</span>
+				<span class="text-fg-dim">●</span>
+			</button>
+		</div>
+
+		// Center — clock (left) + qibla (center) + next prayer (right).
+		// Mobile: stacked, centered. md+: 3-column grid so the compass stays
+		// dead-center regardless of side-content width or whether NextPrayer
+		// is present (the right column is always reserved). justify-between
+		// drifted the qibla when the side blocks had unequal widths or when
+		// NextPrayer was nil (only 2 items → qibla pushed right).
+		<div class="flex flex-1 flex-col items-center justify-center gap-6 md:gap-8">
+			<div class="hero-row flex w-full flex-col items-center justify-center gap-6 md:grid md:grid-cols-3 md:items-center md:gap-4">
+				<div class="hero-cell-left flex justify-center md:justify-self-start">
+					@ClockSection()
+				</div>
+				<div class="hero-cell-center flex justify-center md:justify-self-center">
+					@QiblaSection(data)
+				</div>
+				<div class="hero-cell-right flex justify-center md:justify-self-end md:text-right">
+					if data.NextPrayer != nil {
+						@NextPrayerSection(data.NextPrayer, data.NextIn)
+					}
+				</div>
+			</div>
+			if data.NextPrayer != nil {
+				@PrayerPicker(data.Schedule, data.NextPrayer)
+			}
+		</div>
+
+		// Bottom nav — on-demand expanding menu, centered.
+		// Collapsed by default: a single + trigger. Click expands the three
+		// drawer triggers inline into a centered pill; + rotates to ×.
+		<div class="hero-reveal hero-nav-wrap flex items-center justify-center gap-4" id="nav-wrap">
+			<nav
+				id="bottom-nav"
+				class="hero-nav flex items-center gap-5 font-mono text-[10px] uppercase tracking-[0.2em]"
+				aria-label="Menu navigasi"
+			>
+				<button
+					class="text-fg-muted transition-colors hover:text-fg"
+					hx-get="/partials/schedule"
+					hx-target="#drawer-body"
+					hx-swap="innerHTML"
+					hx-on::after-request="openDrawer(); closeNav()"
+				>
+					Jadwal
+				</button>
+				<button
+					class="text-fg-muted transition-colors hover:text-fg"
+					hx-get="/partials/niat-list"
+					hx-target="#drawer-body"
+					hx-swap="innerHTML"
+					hx-on::after-request="openDrawer(); closeNav()"
+				>
+					Niat
+				</button>
+				<button
+					class="text-fg-muted transition-colors hover:text-fg"
+					hx-get="/partials/jamak-list"
+					hx-target="#drawer-body"
+					hx-swap="innerHTML"
+					hx-on::after-request="openDrawer(); closeNav()"
+				>
+					Jamak
+				</button>
+				<button
+					class="text-fg-muted transition-colors hover:text-fg"
+					hx-get="/partials/ramadan"
+					hx-target="#drawer-body"
+					hx-swap="innerHTML"
+					hx-on::after-request="openDrawer(); closeNav()"
+				>
+					Ramadhan
+				</button>
+				<button
+					class="text-fg-muted transition-colors hover:text-fg"
+					hx-get="/partials/location"
+					hx-target="#drawer-body"
+					hx-swap="innerHTML"
+					hx-on::after-request="openDrawer(); closeNav()"
+				>
+					Lokasi
+				</button>
+			</nav>
+			<button
+				class="hero-nav-trigger grid h-8 w-8 place-items-center rounded-full border border-border text-fg-muted transition-colors hover:text-fg hover:border-fg-muted"
+				type="button"
+				onclick="toggleNav()"
+				aria-label="Buka menu"
+				aria-expanded="false"
+				aria-controls="bottom-nav"
+			>
+				+
+			</button>
+		</div>
+	}
+}
+
+// LocationPicker — full-screen location setup when no cookie is set.
+templ LocationPicker(cities []City) {
+	<section class="hero-reveal mx-auto flex max-w-sm flex-1 flex-col items-center justify-center">
+		<div class="viewfinder-full w-full p-8">
+			<span class="vf-corner vf-tl"></span>
+			<span class="vf-corner vf-tr"></span>
+			<span class="vf-corner vf-bl"></span>
+			<span class="vf-corner vf-br"></span>
+
+			<h2 class="mb-6 text-center font-display text-lg font-bold tracking-wide text-fg">
+				PILIH LOKASI
+			</h2>
+
+			<form hx-post="/location" hx-swap="none" class="flex flex-col gap-4">
+				<label class="flex flex-col gap-1.5 text-[10px] tracking-[0.2em] uppercase text-fg-muted">
+					<span>Kota</span>
+					<select
+						name="city"
+						class="appearance-none rounded-none border border-border bg-surface px-3 py-2.5 font-mono text-sm text-fg focus:outline-1 focus:outline-accent"
+					>
+						for _, c := range cities {
+							<option value={ c.Name + "|" + fmtFloat(c.Lat, 6) + "|" + fmtFloat(c.Lng, 6) }>{ c.Name }</option>
+						}
+					</select>
+				</label>
+				<button
+					type="submit"
+					class="rounded-none bg-fg px-5 py-2.5 font-mono text-xs font-medium tracking-[0.15em] uppercase text-bg transition-colors hover:bg-fg-muted"
+				>
+					Gunakan Kota
+				</button>
+			</form>
+
+			<div class="my-6 flex items-center gap-3">
+				<span class="h-px flex-1 bg-border"></span>
+				<span class="text-[10px] tracking-[0.2em] uppercase text-fg-dim">atau</span>
+				<span class="h-px flex-1 bg-border"></span>
+			</div>
+
+			<form hx-post="/location" hx-swap="none" onsubmit="return useGPS(this)" class="flex flex-col gap-4">
+				<input type="hidden" name="lat"/>
+				<input type="hidden" name="lng"/>
+				<input type="hidden" name="method" value="mwl"/>
+				<button
+					type="submit"
+					class="rounded-none border border-accent bg-transparent px-5 py-2.5 font-mono text-xs font-medium tracking-[0.15em] uppercase text-accent transition-colors hover:bg-accent-soft"
+				>
+					Gunakan GPS
+				</button>
+			</form>
+
+			<noscript class="mt-4 text-center text-xs text-fg-dim">Aktifkan JavaScript untuk GPS.</noscript>
+		</div>
+	</section>
+}
+
+// ClockSection — mission control terminal clock, polled every 1s.
+templ ClockSection() {
+	<section
+		class="hero-reveal text-center"
+		hx-get="/partials/clock"
+		hx-trigger="load, every 1s"
+		hx-swap="innerHTML"
+	>
+		<span class="text-fg-dim">--:--:--</span>
+	</section>
+}
+
+// NextPrayerSection — red pop alert for next prayer.
+// Sits in the right grid cell of the hero row (reserved even when nil, so
+// the compass stays centered). Cell handles md right-alignment; this
+// section just stacks label → name → countdown. IDs let the prayer
+// picker update it client-side.
+templ NextPrayerSection(next *PrayerTime, in string) {
+	<section class="hero-reveal flex flex-col items-center gap-1.5 text-center md:items-end md:text-right" id="next-prayer-display">
+		<span class="text-[10px] tracking-[0.3em] uppercase text-fg-dim" id="next-prayer-label">
+			sholat berikutnya
+		</span>
+		<span class="font-display text-base font-bold tracking-tight text-pop md:text-lg" id="next-prayer-name">
+			{ PrayerLabel[next.Name] }
+		</span>
+		<span class="font-mono text-xs tabular-nums text-fg-muted" id="next-prayer-countdown">dalam { in }</span>
+	</section>
+}
+
+// PrayerPicker — segmented control with a sliding accent underline.
+// One row of 5 tappable segments (Subuh..Isya); each segment stacks the
+// prayer name over its time, turning the control into an at-a-glance
+// schedule. Tapping a segment eases a thin accent underline to it and
+// updates NextPrayerSection via pickPrayer(). Each segment carries data-*
+// attributes for the JS countdown logic. Replaces the native range slider
+// — 48px touch targets, on-aesthetic with the thin-line viewfinder
+// language, and the eased indicator motion (GPU transform only) is the
+// premium feel. Document-level click handler in layout.templ dispatches
+// .prayer-segment clicks to setPrayerPicker().
+templ PrayerPicker(sched []PrayerTime, next *PrayerTime) {
+	if len(sched) == 0 {
+		return
+	}
+	{{ defaultIdx := pickerDefaultIndex(sched, next) }}
+	<div
+		class="prayer-segments hero-reveal flex w-full max-w-lg items-stretch font-mono"
+		id="prayer-picker"
+		role="group"
+		aria-label="Pilih sholat"
+		data-active={ fmt.Sprintf("%d", defaultIdx) }
+		style={ "--count: " + fmt.Sprintf("%d", len(sched)) + "; --active: " + fmt.Sprintf("%d", defaultIdx) }
+	>
+		<span class="prayer-indicator" aria-hidden="true"></span>
+		for i, p := range sched {
+			<button
+				class={ "prayer-segment hover:text-fg " + pickerStopClass(i, defaultIdx) }
+				data-idx={ fmt.Sprintf("%d", i) }
+				data-label={ PrayerLabel[p.Name] }
+				data-time={ p.Time.Format("15:04") }
+				data-iso={ p.Time.Format("2006-01-02T15:04:05Z07:00") }
+				aria-pressed={ fmt.Sprintf("%t", i == defaultIdx) }
+			>
+				<span class="prayer-segment-name">{ PrayerLabel[p.Name] }</span>
+				<span class="prayer-segment-time">{ p.Time.Format("15:04") }</span>
+			</button>
+		}
+	</div>
+}
+
+// pickerDefaultIndex returns the schedule index of the next prayer,
+// or the last index if all prayers have passed.
+func pickerDefaultIndex(sched []PrayerTime, next *PrayerTime) int {
+	if next != nil {
+		for i, p := range sched {
+			if p.Name == next.Name {
+				return i
+			}
+		}
+	}
+	if len(sched) > 0 {
+		return len(sched) - 1
+	}
+	return 0
+}
+
+// pickerStopClass highlights the active stop.
+func pickerStopClass(i, defaultIdx int) string {
+	if i == defaultIdx {
+		return "text-accent"
+	}
+	return "text-fg-dim"
+}
+
+// LocationDrawer — location picker + method picker for the drawer.
+templ LocationDrawer(data PageData) {
+	<div class="p-6 md:p-8">
+		<div class="flex items-center justify-between border-b border-border pb-4">
+			<div>
+				<span class="block text-[10px] tracking-[0.3em] uppercase text-fg-dim">Pengaturan</span>
+				<h2 class="font-display text-xl font-bold tracking-tight text-fg">Lokasi & Metode</h2>
+			</div>
+			<button
+				class="grid h-8 w-8 place-items-center rounded-full border border-border text-fg-muted transition-colors hover:text-fg hover:border-fg-muted"
+				onclick="closeDrawer()"
+				aria-label="Tutup"
+			>
+				✕
+			</button>
+		</div>
+
+		// City picker
+		<form hx-post="/location" hx-swap="none" class="mt-6 flex flex-col gap-4">
+			<label class="flex flex-col gap-1.5 text-[10px] tracking-[0.2em] uppercase text-fg-muted">
+				<span>Kota</span>
+				<select
+					name="city"
+					class="appearance-none rounded-none border border-border bg-surface px-3 py-2.5 font-mono text-sm text-fg focus:outline-1 focus:outline-accent"
+				>
+					for _, c := range data.Cities {
+						<option value={ c.Name + "|" + fmtFloat(c.Lat, 6) + "|" + fmtFloat(c.Lng, 6) }>{ c.Name }</option>
+					}
+				</select>
+			</label>
+			<button
+				type="submit"
+				class="rounded-none bg-fg px-5 py-2.5 font-mono text-xs font-medium tracking-[0.15em] uppercase text-bg transition-colors hover:bg-fg-muted"
+			>
+				Gunakan Kota
+			</button>
+		</form>
+
+		<div class="my-6 flex items-center gap-3">
+			<span class="h-px flex-1 bg-border"></span>
+			<span class="text-[10px] tracking-[0.2em] uppercase text-fg-dim">atau</span>
+			<span class="h-px flex-1 bg-border"></span>
+		</div>
+
+		// GPS
+		<form hx-post="/location" hx-swap="none" onsubmit="return useGPS(this)" class="flex flex-col gap-4">
+			<input type="hidden" name="lat"/>
+			<input type="hidden" name="lng"/>
+			<input type="hidden" name="method" value={ data.MethodID }/>
+			<button
+				type="submit"
+				class="rounded-none border border-accent bg-transparent px-5 py-2.5 font-mono text-xs font-medium tracking-[0.15em] uppercase text-accent transition-colors hover:bg-accent-soft"
+			>
+				Gunakan GPS
+			</button>
+		</form>
+
+		// Method picker
+		@MethodPicker(data.MethodID)
+
+		<button
+			class="mt-6 w-full rounded-none border border-border bg-transparent px-5 py-2.5 font-mono text-xs font-medium tracking-[0.15em] uppercase text-fg-muted transition-colors hover:border-fg-muted hover:text-fg"
+			onclick="closeDrawer()"
+		>
+			tutup
+		</button>
+	</div>
+}
+
+// NiatListDrawer — list of all 5 prayers, click to see niat.
+templ NiatListDrawer() {
+	<div class="p-6 md:p-8">
+		<div class="flex items-center justify-between border-b border-border pb-4">
+			<div>
+				<span class="block text-[10px] tracking-[0.3em] uppercase text-fg-dim">Niat</span>
+				<h2 class="font-display text-xl font-bold tracking-tight text-fg">Pilih Sholat</h2>
+			</div>
+			<button
+				class="grid h-8 w-8 place-items-center rounded-full border border-border text-fg-muted transition-colors hover:text-fg hover:border-fg-muted"
+				onclick="closeDrawer()"
+				aria-label="Tutup"
+			>
+				✕
+			</button>
+		</div>
+
+		<ul class="list-none">
+			for _, name := range []PrayerName{ Subuh, Zuhur, Ashar, Maghrib, Isya } {
+				<li class="border-b border-border-2">
+					<button
+						class="flex w-full items-center py-3 font-mono text-sm font-medium tracking-wide text-fg transition-colors hover:text-accent"
+						hx-get={ "/partials/niat?prayer=" + string(name) }
+						hx-target="#drawer-body"
+						hx-swap="innerHTML"
+					>
+						{ PrayerLabel[name] }
+						<span class="ml-auto text-fg-dim">→</span>
+					</button>
+				</li>
+			}
+		</ul>
+
+		<button
+			class="mt-6 w-full rounded-none border border-border bg-transparent px-5 py-2.5 font-mono text-xs font-medium tracking-[0.15em] uppercase text-fg-muted transition-colors hover:border-fg-muted hover:text-fg"
+			onclick="closeDrawer()"
+		>
+			tutup
+		</button>
+	</div>
+}
+
+// JamakListDrawer — list of the four valid jamak combinations, click to see niat.
+// Same shape as NiatListDrawer; rows are jamak pairs, not single prayers.
+templ JamakListDrawer() {
+	<div class="p-6 md:p-8">
+		<div class="flex items-center justify-between border-b border-border pb-4">
+			<div>
+				<span class="block text-[10px] tracking-[0.3em] uppercase text-fg-dim">Jamak</span>
+				<h2 class="font-display text-xl font-bold tracking-tight text-fg">Pilih Jamak</h2>
+			</div>
+			<button
+				class="grid h-8 w-8 place-items-center rounded-full border border-border text-fg-muted transition-colors hover:text-fg hover:border-fg-muted"
+				onclick="closeDrawer()"
+				aria-label="Tutup"
+			>
+				✕
+			</button>
+		</div>
+
+		<ul class="list-none">
+			for _, j := range JamakList {
+				<li class="border-b border-border-2">
+					<button
+						class="flex w-full items-center py-3 text-left font-mono text-sm font-medium tracking-wide text-fg transition-colors hover:text-accent"
+						hx-get={ "/partials/jamak?first=" + string(j.First) + "&second=" + string(j.Second) + "&mode=" + string(j.Mode) }
+						hx-target="#drawer-body"
+						hx-swap="innerHTML"
+					>
+						<span class="flex flex-col gap-0.5">
+							<span class="text-fg">{ PrayerLabel[j.First] } → { PrayerLabel[j.Second] }</span>
+							<span class="text-[10px] tracking-[0.2em] uppercase text-fg-dim">
+								if j.Mode == JamakTaqdim {
+									Taqdim
+								} else {
+									Ta'khir
+								}
+							</span>
+						</span>
+						<span class="ml-auto text-fg-dim">→</span>
+					</button>
+				</li>
+			}
+		</ul>
+
+		<button
+			class="mt-6 w-full rounded-none border border-border bg-transparent px-5 py-2.5 font-mono text-xs font-medium tracking-[0.15em] uppercase text-fg-muted transition-colors hover:border-fg-muted hover:text-fg"
+			onclick="closeDrawer()"
+		>
+			tutup
+		</button>
+	</div>
+}

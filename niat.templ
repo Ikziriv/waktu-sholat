@@ -1,0 +1,52 @@
+package main
+
+// NiatPartial — rendered inside the drawer.
+// Monospace metadata header, large Amiri Arabic niat, italic transliteration,
+// plain Indonesian translation. 21hrs.space aesthetic: sparse, technical, warm.
+// Shared by single-prayer niat and jamak: callers pass the header label and
+// the three text fields, so no caller-specific lookup lives here.
+templ NiatPartial(label, arabic, transliteration, translation string) {
+	<div class="p-6 md:p-8">
+		// Header — label in display font, close button
+		<div class="flex items-center justify-between border-b border-border pb-4">
+			<div>
+				<span class="block text-[10px] tracking-[0.3em] uppercase text-fg-dim">Niat</span>
+				<h2 class="font-display text-xl font-bold tracking-tight text-fg">{ label }</h2>
+			</div>
+			<button
+				class="grid h-8 w-8 place-items-center rounded-full border border-border text-fg-muted transition-colors hover:text-fg hover:border-fg-muted"
+				onclick="closeDrawer()"
+				aria-label="Tutup"
+			>
+				✕
+			</button>
+		</div>
+
+		// Arabic niat — RTL, Amiri serif, large
+		<p
+			dir="rtl"
+			lang="ar"
+			class="mt-6 text-right font-arabic text-2xl leading-loose text-fg md:text-3xl"
+		>
+			{ arabic }
+		</p>
+
+		// Transliteration — italic monospace
+		<p class="mt-6 font-mono text-sm italic leading-relaxed text-fg-muted">
+			{ transliteration }
+		</p>
+
+		// Translation — plain monospace
+		<p class="mt-4 font-mono text-sm leading-relaxed text-fg">
+			{ translation }
+		</p>
+
+		// Footer — close button
+		<button
+			class="mt-8 w-full rounded-none border border-border bg-transparent px-5 py-2.5 font-mono text-xs font-medium tracking-[0.15em] uppercase text-fg-muted transition-colors hover:border-fg-muted hover:text-fg"
+			onclick="closeDrawer()"
+		>
+			tutup
+		</button>
+	</div>
+}

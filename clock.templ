@@ -1,0 +1,17 @@
+package main
+
+import "time"
+
+// ClockPartial — mission control terminal clock, medium size.
+// Monospace time with subtle glow, small uppercase date with wide tracking.
+templ ClockPartial(now time.Time) {
+	<time
+		class="terminal-glow block font-mono text-xl font-light tabular-nums tracking-wider text-fg md:text-2xl"
+		datetime={ now.Format("2006-01-02T15:04:05") }
+	>
+		{ now.Format("15:04:05") }
+	</time>
+	<span class="mt-1.5 block font-mono text-[10px] uppercase tracking-[0.3em] text-fg-muted">
+		{ now.Format("Mon, 02 Jan 2006") }
+	</span>
+}

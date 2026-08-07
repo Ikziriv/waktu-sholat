@@ -1,0 +1,108 @@
+package main
+
+import "math"
+
+// QiblaSection — premium gyroscopic compass for the hero screen.
+// Multi-ring navigation instrument with graduated ticks, degree numerals,
+// a glowing qibla bearing marker on the outer ring, and a spring-settling
+// needle. Centered in the hero between clock and next-prayer.
+templ QiblaSection(data PageData) {
+	<section class="hero-reveal flex flex-col items-center gap-3">
+		// Eyebrow label — instrument panel header
+		<span class="font-mono text-[10px] tracking-[0.3em] uppercase text-fg-dim">Kiblat</span>
+
+		// Viewfinder-framed compass instrument
+		<div class="viewfinder-full aspect-square w-[210px] p-3 md:w-[270px]">
+			<span class="vf-corner vf-tl"></span>
+			<span class="vf-corner vf-tr"></span>
+			<span class="vf-corner vf-bl"></span>
+			<span class="vf-corner vf-br"></span>
+
+			@CompassDial(data.QiblaBearing)
+		</div>
+
+		// Bearing readout — instrument panel
+		<div class="flex flex-col items-center gap-0.5">
+			<div class="flex items-baseline gap-1.5">
+				<span class="font-display text-3xl font-bold tabular-nums text-fg md:text-4xl">
+					{ fmtFloat(data.QiblaBearing, 0) }°
+				</span>
+			</div>
+			<span class="font-mono text-[10px] tracking-[0.25em] uppercase text-fg-muted">
+				dari utara
+			</span>
+			<span class="font-mono text-[10px] tracking-[0.15em] text-fg-dim">Ka'bah · Makkah</span>
+		</div>
+	</section>
+}
+
+// CompassDial — gyroscopic navigation instrument SVG.
+// Fixed rose (N up), needle points to qibla bearing (clockwise from north).
+// Outer ring carries a glowing qibla marker at the bearing angle.
+// Bearing sign: rotate(+bearing) — clockwise from north matches the
+// great-circle bearing convention. (The previous -bearing mirrored it.)
+templ CompassDial(bearing float64) {
+	{{ brg := fmtFloat(bearing, 2) }}
+	<svg viewBox="0 0 200 200" class="compass-dial h-full w-full" role="img" aria-label={ "Arah kiblat " + fmtFloat(bearing, 1) + " derajat dari utara" }>
+		// Outer + inner bezel rings — machined instrument housing (double bezel)
+		<circle cx="100" cy="100" r="95" fill="none" stroke="var(--color-border)" stroke-width="0.6"/>
+		<circle cx="100" cy="100" r="90" fill="none" stroke="var(--color-border-2)" stroke-width="0.4"/>
+
+		// Qibla bearing marker — glowing accent tab on the outer ring at the
+		// bearing angle. Rotates with +bearing so it sits where the needle points.
+		<g class="qibla-marker" style={ "transform: rotate(" + brg + "deg)" }>
+			<polygon points="100,1 96.5,10 103.5,10" fill="var(--color-accent)"/>
+			<line x1="100" y1="11" x2="100" y2="20" stroke="var(--color-accent)" stroke-width="1" stroke-linecap="round"/>
+		</g>
+
+		// Tick marks — 36 every 10°, major every 30° (accent-tinted, longer)
+		for i := 0; i < 36; i++ {
+			{{ a := float64(i) * 10.0 }}
+			{{ rad := a * math.Pi / 180.0 }}
+			{{ x1 := 100.0 + 88.0 * math.Sin(rad) }}
+			{{ y1 := 100.0 - 88.0 * math.Cos(rad) }}
+			if i % 3 == 0 {
+				{{ x2 := 100.0 + 78.0 * math.Sin(rad) }}
+				{{ y2 := 100.0 - 78.0 * math.Cos(rad) }}
+				<line x1={ fmtFloat(x1, 2) } y1={ fmtFloat(y1, 2) } x2={ fmtFloat(x2, 2) } y2={ fmtFloat(y2, 2) } stroke="var(--color-accent-2)" stroke-width="0.8" stroke-linecap="round"/>
+			} else {
+				{{ x2 := 100.0 + 83.0 * math.Sin(rad) }}
+				{{ y2 := 100.0 - 83.0 * math.Cos(rad) }}
+				<line x1={ fmtFloat(x1, 2) } y1={ fmtFloat(y1, 2) } x2={ fmtFloat(x2, 2) } y2={ fmtFloat(y2, 2) } stroke="var(--color-fg-muted)" stroke-width="0.4" stroke-linecap="round" opacity="0.5"/>
+			}
+		}
+
+		// Degree numerals at non-cardinal major ticks (30,60,120,150,210,240,300,330)
+		for i := 0; i < 12; i++ {
+			if i % 3 != 0 {
+				{{ deg := float64(i) * 30.0 }}
+				{{ rad := deg * math.Pi / 180.0 }}
+				{{ x := 100.0 + 73.0 * math.Sin(rad) }}
+				{{ y := 100.0 - 73.0 * math.Cos(rad) }}
+				<text x={ fmtFloat(x, 2) } y={ fmtFloat(y, 2) } text-anchor="middle" dominant-baseline="central" font-family="var(--font-mono)" font-size="5" fill="var(--color-fg-dim)" font-weight="400">{ fmtFloat(deg, 0) }</text>
+			}
+		}
+
+		// Cardinal letters — N accent/bold, others muted
+		<text x="100" y="38" text-anchor="middle" dominant-baseline="central" font-family="var(--font-mono)" font-size="8.5" fill="var(--color-accent)" font-weight="700">N</text>
+		<text x="162" y="100" text-anchor="middle" dominant-baseline="central" font-family="var(--font-mono)" font-size="8.5" fill="var(--color-fg-muted)" font-weight="500">E</text>
+		<text x="100" y="162" text-anchor="middle" dominant-baseline="central" font-family="var(--font-mono)" font-size="8.5" fill="var(--color-fg-muted)" font-weight="500">S</text>
+		<text x="38" y="100" text-anchor="middle" dominant-baseline="central" font-family="var(--font-mono)" font-size="8.5" fill="var(--color-fg-muted)" font-weight="500">W</text>
+
+		// Inner dial face
+		<circle cx="100" cy="100" r="52" fill="none" stroke="var(--color-border-2)" stroke-width="0.4"/>
+
+		// Needle — slim two-tone diamond, accent head + dim tail.
+		// --bearing drives the CSS settle animation; inline transform is the
+		// resting state (works without JS).
+		<g class="compass-needle" style={ "--bearing: " + brg + "deg; transform: rotate(" + brg + "deg)" }>
+			<path d="M100,56 L102.5,100 L97.5,100 Z" fill="var(--color-accent)"/>
+			<path d="M100,144 L102.5,100 L97.5,100 Z" fill="var(--color-fg-dim)" opacity="0.55"/>
+			<line x1="100" y1="56" x2="100" y2="144" stroke="var(--color-accent)" stroke-width="0.4" opacity="0.3"/>
+		</g>
+
+		// Center hub — pivot
+		<circle cx="100" cy="100" r="5" fill="none" stroke="var(--color-accent)" stroke-width="0.5"/>
+		<circle cx="100" cy="100" r="2.2" fill="var(--color-accent)"/>
+	</svg>
+}

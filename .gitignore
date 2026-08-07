@@ -1,0 +1,18 @@
+# Build artifacts
+waktu-sholat.exe
+waktu-sholat-desktop.exe
+*_templ.go
+
+# Compiled CSS
+static/out.css
+frontend/dist/out.css
+
+# Wails build output
+build/
+
+# Node
+node_modules/
+
+# IDE
+.vscode/
+.idea/

@@ -1,0 +1,96 @@
+package main
+
+// ScheduleSection — full prayer schedule for the drawer.
+// Terminal-style list with niat triggers + method picker.
+templ ScheduleSection(data PageData) {
+	<div class="p-6 md:p-8">
+		<div class="flex items-center justify-between border-b border-border pb-4">
+			<div>
+				<span class="block text-[10px] tracking-[0.3em] uppercase text-fg-dim">Jadwal</span>
+				<h2 class="font-display text-xl font-bold tracking-tight text-fg">Sholat Hari Ini</h2>
+			</div>
+			<button
+				class="grid h-8 w-8 place-items-center rounded-full border border-border text-fg-muted transition-colors hover:text-fg hover:border-fg-muted"
+				onclick="closeDrawer()"
+				aria-label="Tutup"
+			>
+				✕
+			</button>
+		</div>
+
+		if len(data.Schedule) > 0 {
+			<ul class="list-none">
+				for _, p := range data.Schedule {
+					@PrayerRow(p, data.NextPrayer)
+				}
+			</ul>
+			if data.NextPrayer != nil {
+				<p class="mt-4 font-mono text-[11px] text-fg-muted">
+					<span class="text-pop">●</span>
+					{" "}
+					Berikutnya: <span class="text-fg">{ PrayerLabel[data.NextPrayer.Name] }</span>
+					{" "}
+					<span class="tabular-nums">{ data.NextPrayer.Time.Format("15:04") }</span>
+					{" — dalam "}
+					<span class="text-accent">{ data.NextIn }</span>
+				</p>
+			}
+			@MethodPicker(data.MethodID)
+		} else {
+			<p class="py-4 font-mono text-xs text-fg-dim">Jadwal tidak tersedia.</p>
+		}
+
+		<button
+			class="mt-6 w-full rounded-none border border-border bg-transparent px-5 py-2.5 font-mono text-xs font-medium tracking-[0.15em] uppercase text-fg-muted transition-colors hover:border-fg-muted hover:text-fg"
+			onclick="closeDrawer()"
+		>
+			tutup
+		</button>
+	</div>
+}
+
+// PrayerRow — one prayer row. Monospace data, button opens niat drawer.
+templ PrayerRow(p PrayerTime, next *PrayerTime) {
+	<li class={ "flex items-center border-b border-border-2 py-3 transition-colors hover:bg-surface" + prayerRowNextClass(next, p.Name) }>
+		<button
+			class="font-mono text-sm font-medium tracking-wide text-fg transition-colors hover:text-accent"
+			hx-get={ "/partials/niat?prayer=" + string(p.Name) }
+			hx-target="#drawer-body"
+			hx-swap="innerHTML"
+		>
+			{ PrayerLabel[p.Name] }
+		</button>
+		<span class="ml-auto font-mono text-sm tabular-nums text-fg-muted">
+			{ p.Time.Format("15:04") }
+		</span>
+	</li>
+}
+
+func prayerRowNextClass(next *PrayerTime, name PrayerName) string {
+	if next != nil && next.Name == name {
+		return " prayer-row--next -mx-2 px-2"
+	}
+	return ""
+}
+
+// MethodPicker — minimal monospace dropdown.
+templ MethodPicker(methodID string) {
+	<form class="mt-5 flex items-center gap-2" hx-post="/location" hx-swap="none">
+		<span class="text-[10px] tracking-[0.2em] uppercase text-fg-dim">Metode</span>
+		<select
+			name="method"
+			onchange="this.form.submit()"
+			class="appearance-none rounded-none border border-border bg-surface px-2 py-1 font-mono text-[11px] text-fg focus:outline-1 focus:outline-accent"
+		>
+			for _, m := range Methods {
+				if m.ID == methodID {
+					<option value={ m.ID } selected>{ m.Name }</option>
+				} else {
+					<option value={ m.ID }>{ m.Name }</option>
+				}
+			}
+		</select>
+		<input type="hidden" name="lat" value=""/>
+		<input type="hidden" name="lng" value=""/>
+	</form>
+}

@@ -1,0 +1,24 @@
+# Build artifacts (regenerated inside the image)
+*_templ.go
+static/out.css
+*.exe
+*.exe~
+
+# VCS / IDE
+.git
+.gitignore
+.vscode
+.idea
+
+# Node
+node_modules/
+
+# Wails build output
+build/
+
+# Docs (not needed at runtime/build)
+docs/
+README.md
+
+# Platform-specific build script (Dockerfile replaces it)
+build.ps1

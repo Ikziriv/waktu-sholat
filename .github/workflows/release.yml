@@ -1,0 +1,54 @@
+name: release
+
+# Build both Windows exes (portable web + Wails desktop) and attach them
+# to a GitHub Release on every v* tag push.
+# Users download from: https://github.com/Ikziriv/waktu-sholat/releases
+
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: write
+
+jobs:
+  build-windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version: "1.25"
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Install templ + Wails CLIs
+        run: |
+          go install github.com/a-h/templ/cmd/templ@latest
+          go install github.com/wailsapp/wails/v2/cmd/wails@latest
+
+      - name: Generate templ + compile Tailwind
+        run: |
+          templ generate
+          npx @tailwindcss/cli -i input.css -o static/out.css --minify
+
+      - name: Build portable web exe
+        run: go build -trimpath -ldflags "-s -w" -o waktu-sholat.exe .
+
+      - name: Build Wails desktop exe
+        run: wails build -clean -trimpath -ldflags "-s -w"
+
+      - name: Stage release assets
+        run: |
+          Copy-Item build/bin/waktu-sholat.exe waktu-sholat-desktop.exe
+          (Get-Item waktu-sholat.exe, waktu-sholat-desktop.exe).Name,Length
+
+      - uses: softprops/action-gh-release@v2
+        with:
+          generate_release_notes: true
+          files: |
+            waktu-sholat.exe
+            waktu-sholat-desktop.exe
