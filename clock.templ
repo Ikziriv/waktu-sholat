@@ -2,16 +2,39 @@ package main
 
 import "time"
 
-// ClockPartial — mission control terminal clock, medium size.
-// Monospace time with subtle glow, small uppercase date with wide tracking.
+// ClockPartial — precision mission-control chronometer instrument.
+// Split HH:MM primary display + :SS sub-module, 60-second progress sweep bar,
+// live prayer-phase telemetry header, and dual Gregorian + Hijriyah calendar readout.
 templ ClockPartial(now time.Time) {
-	<time
-		class="terminal-glow block font-mono text-xl font-light tabular-nums tracking-wider text-fg md:text-2xl"
-		datetime={ now.Format("2006-01-02T15:04:05") }
-	>
-		{ now.Format("15:04:05") }
-	</time>
-	<span class="mt-1.5 block font-mono text-[10px] uppercase tracking-[0.3em] text-fg-muted">
-		{ now.Format("Mon, 02 Jan 2006") }
-	</span>
+	<div class="chronometer" id="chronometer-root" data-server-iso={ now.Format(time.RFC3339) }>
+		<div class="chrono-header">
+			<span class="chrono-live-dot" aria-hidden="true"></span>
+			<span class="chrono-eyebrow" id="chrono-phase-label">WAKTU LOKAL</span>
+			<span class="chrono-tz" id="chrono-tz">{ now.Format("MST") }</span>
+		</div>
+
+		<time
+			class="chrono-time-row terminal-glow"
+			id="chrono-time"
+			datetime={ now.Format("2006-01-02T15:04:05") }
+		>
+			<span class="chrono-hm" id="chrono-hm">{ now.Format("15:04") }</span>
+			<span class="chrono-sec-wrap">
+				<span class="chrono-colon">:</span>
+				<span class="chrono-ss" id="chrono-ss">{ now.Format("05") }</span>
+			</span>
+		</time>
+
+		<div class="chrono-progress-track" aria-hidden="true">
+			<span class="chrono-progress-fill" id="chrono-sec-bar"></span>
+		</div>
+
+		<div class="chrono-dates">
+			<span class="chrono-date-greg" id="chrono-date-greg">
+				{ now.Format("Mon, 02 Jan 2006") }
+			</span>
+			<span class="chrono-date-hijri" id="chrono-date-hijri"></span>
+		</div>
+	</div>
 }
+

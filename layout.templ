@@ -7,7 +7,7 @@ import "strconv"
 // Single hero screen (100dvh) — all content fits in one viewport, drawers for details.
 templ Layout(title string, content templ.Component) {
 	<!DOCTYPE html>
-	<html lang="id">
+	<html lang="id" data-theme="dark">
 	<head>
 		<meta charset="utf-8"/>
 		<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover"/>
@@ -18,9 +18,7 @@ templ Layout(title string, content templ.Component) {
 			(function(){
 				try {
 					var t = localStorage.getItem('ws_theme');
-					if (t === 'light' || t === 'dark') {
-						document.documentElement.setAttribute('data-theme', t);
-					}
+					document.documentElement.setAttribute('data-theme', (t === 'light' || t === 'dark') ? t : 'dark');
 				} catch (e) {}
 			})();
 		</script>
@@ -28,7 +26,7 @@ templ Layout(title string, content templ.Component) {
 	<body class="min-h-[100dvh] overflow-hidden antialiased">
 		@MoonCanvas()
 		@ThemeToggle()
-		<main class="relative z-10 flex min-h-[100dvh] flex-col px-6 py-6 md:px-10 md:py-8">
+		<main class="relative z-10 flex min-h-[100dvh] flex-col px-6 pt-16 pb-6 md:px-10 md:py-8">
 			@content
 		</main>
 		@Drawer()
@@ -37,10 +35,11 @@ templ Layout(title string, content templ.Component) {
 	</html>
 }
 
-// MoonCanvas — fixed full-screen Three.js moon + galaxy particle field.
-// Always renders (dimmer in light theme). Galaxy + star shell are dark-theme
-// only (additive blending is invisible on the cream light bg).
-// Respects prefers-reduced-motion (skips 3D entirely).
+// MoonCanvas — fixed full-screen Three.js Celestial Prayer Observatory.
+// Automatically transitions lighting, atmosphere, astrolabe rings, galaxy,
+// and starfield across the 5 daily prayer phases (Subuh, Zuhur, Ashar,
+// Maghrib, Isya) using real-time prayer timestamps from #prayer-picker.
+// Respects prefers-reduced-motion (skips 3D entirely) and reacts to theme changes.
 templ MoonCanvas() {
 	<canvas id="moon-canvas" class="fixed inset-0 z-0 pointer-events-none opacity-0"></canvas>
 	<script type="importmap">
@@ -58,9 +57,11 @@ templ MoonCanvas() {
 				if (c) c.style.opacity = '0.15';
 				return;
 			}
-			var isDark = document.documentElement.getAttribute('data-theme') === 'dark' ||
-				(!document.documentElement.hasAttribute('data-theme') &&
-				 matchMedia('(prefers-color-scheme: dark)').matches);
+
+			function checkIsDark() {
+				return document.documentElement.getAttribute('data-theme') !== 'light';
+			}
+			var isDark = checkIsDark();
 
 			Promise.all([
 				import('three'),
@@ -72,10 +73,6 @@ templ MoonCanvas() {
 				var canvas = document.getElementById('moon-canvas');
 				if (!canvas) return;
 
-				// antialias only on low-DPI (invisible + costly on retina); cap
-				// pixel ratio at 1.5 — this is a background canvas, 2x renders 4x
-				// pixels for no visible gain. powerPreference picks the dGPU on
-				// dual-GPU laptops (common on macOS).
 				var dpr = Math.min(window.devicePixelRatio, 1.5);
 				var renderer = new THREE.WebGLRenderer({
 					canvas: canvas,
@@ -90,91 +87,422 @@ templ MoonCanvas() {
 				var camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 100);
 				camera.position.z = 5;
 
-				// Moon — sphere with NASA moon texture
+				// ---- Prayer-phase presets (astronomical lighting + atmosphere) ----
+				var PHASES = {
+					subuh: {
+						lightPos: [5.5, 0.9, 2.2],
+						lightColor: 0xffb899,
+						lightInt: 0.95,
+						ambientColor: 0x3d4a7a,
+						ambientInt: 0.35,
+						emissiveColor: 0x2b1e2e,
+						emissiveInt: 0.18,
+						coronaColor: 0xe89c84,
+						coronaInt: 0.72,
+						horizonColor: 0xc97b63,
+						zenithColor: 0x0d1329,
+						skyInt: 0.34,
+						ringColor: 0xe4b592,
+						ringOpacity: 0.42,
+						ringTilt: 0.35,
+						starsOpacity: 0.55,
+						galaxyOpacity: 0.45,
+						dustOpacity: 0.45
+					},
+					zuhur: {
+						lightPos: [0.8, 6.0, 3.2],
+						lightColor: 0xfff5e0,
+						lightInt: 1.35,
+						ambientColor: 0xffe6bd,
+						ambientInt: 0.55,
+						emissiveColor: 0x4a3518,
+						emissiveInt: 0.26,
+						coronaColor: 0xffd27d,
+						coronaInt: 0.92,
+						horizonColor: 0xf5d598,
+						zenithColor: 0x1e2a3a,
+						skyInt: 0.22,
+						ringColor: 0xe4b592,
+						ringOpacity: 0.52,
+						ringTilt: 0.18,
+						starsOpacity: 0.08,
+						galaxyOpacity: 0.12,
+						dustOpacity: 0.85
+					},
+					ashar: {
+						lightPos: [-4.8, 2.2, 2.4],
+						lightColor: 0xffb36b,
+						lightInt: 1.12,
+						ambientColor: 0x5e3c24,
+						ambientInt: 0.38,
+						emissiveColor: 0x361f0e,
+						emissiveInt: 0.2,
+						coronaColor: 0xe89149,
+						coronaInt: 0.8,
+						horizonColor: 0xd98245,
+						zenithColor: 0x16192b,
+						skyInt: 0.28,
+						ringColor: 0xd98245,
+						ringOpacity: 0.48,
+						ringTilt: 0.45,
+						starsOpacity: 0.18,
+						galaxyOpacity: 0.25,
+						dustOpacity: 0.7
+					},
+					maghrib: {
+						lightPos: [-6.0, -0.3, 2.0],
+						lightColor: 0xff6e54,
+						lightInt: 1.0,
+						ambientColor: 0x3b2042,
+						ambientInt: 0.32,
+						emissiveColor: 0x2e1118,
+						emissiveInt: 0.22,
+						coronaColor: 0xe65c53,
+						coronaInt: 0.85,
+						horizonColor: 0x9c3d4f,
+						zenithColor: 0x120d24,
+						skyInt: 0.38,
+						ringColor: 0xe49582,
+						ringOpacity: 0.45,
+						ringTilt: 0.55,
+						starsOpacity: 0.5,
+						galaxyOpacity: 0.52,
+						dustOpacity: 0.4
+					},
+					isya: {
+						lightPos: [-3.2, 2.4, 2.5],
+						lightColor: 0xfff3ea,
+						lightInt: 0.85,
+						ambientColor: 0x1d233a,
+						ambientInt: 0.24,
+						emissiveColor: 0x1a1410,
+						emissiveInt: 0.14,
+						coronaColor: 0x9aa8d6,
+						coronaInt: 0.55,
+						horizonColor: 0x161c36,
+						zenithColor: 0x05070f,
+						skyInt: 0.22,
+						ringColor: 0xe4b592,
+						ringOpacity: 0.35,
+						ringTilt: 0.65,
+						starsOpacity: 0.78,
+						galaxyOpacity: 0.88,
+						dustOpacity: 0.25
+					}
+				};
+
+				function readScheduleTimes() {
+					var stops = document.querySelectorAll('.prayer-segment[data-iso]');
+					if (stops.length >= 5) {
+						var map = {};
+						stops.forEach(function(el) {
+							var lbl = (el.getAttribute('data-label') || '').toLowerCase();
+							var ms = Date.parse(el.getAttribute('data-iso'));
+							if (!isNaN(ms)) map[lbl] = ms;
+						});
+						if (map.subuh && map.zuhur && map.ashar && map.maghrib && map.isya) {
+							return map;
+						}
+					}
+					// Fallback for onboarding screen (no #prayer-picker in DOM)
+					var d = new Date();
+					function at(h, m) {
+						return new Date(d.getFullYear(), d.getMonth(), d.getDate(), h, m, 0).getTime();
+					}
+					return { subuh: at(4, 30), zuhur: at(12, 0), ashar: at(15, 15), maghrib: at(18, 0), isya: at(19, 15) };
+				}
+
+				var previewKey = null;
+				var previewUntil = 0;
+				window.wsPreviewPrayerPhase = function(label) {
+					var key = (label || '').toLowerCase();
+					if (PHASES[key]) {
+						previewKey = key;
+						previewUntil = performance.now() + 6500;
+					}
+				};
+
+				var lastPhaseAttr = '';
+				var lastModeAttr = '';
+				function syncPhaseAttributes(phaseKey, modeKey) {
+					if (phaseKey !== lastPhaseAttr) {
+						lastPhaseAttr = phaseKey;
+						document.documentElement.setAttribute('data-prayer-phase', phaseKey);
+					}
+					if (modeKey !== lastModeAttr) {
+						lastModeAttr = modeKey;
+						document.documentElement.setAttribute('data-prayer-mode', modeKey);
+					}
+				}
+
+				function getPhaseBlend() {
+					var nowPerf = performance.now();
+					if (previewKey && nowPerf < previewUntil) {
+						syncPhaseAttributes(previewKey, 'preview');
+						return { a: PHASES[previewKey], b: PHASES[previewKey], t: 0, key: previewKey };
+					}
+					previewKey = null;
+					var now = Date.now();
+					var s = readScheduleTimes();
+					var dayMs = 86400000;
+					var order = [
+						{ key: 'subuh', ms: s.subuh },
+						{ key: 'zuhur', ms: s.zuhur },
+						{ key: 'ashar', ms: s.ashar },
+						{ key: 'maghrib', ms: s.maghrib },
+						{ key: 'isya', ms: s.isya }
+					];
+					var a = order[4], b = order[0], spanStart = s.isya - dayMs, spanEnd = s.subuh;
+					if (now >= s.isya) {
+						a = order[4]; b = order[0]; spanStart = s.isya; spanEnd = s.subuh + dayMs;
+					} else {
+						for (var i = 0; i < 4; i++) {
+							if (now >= order[i].ms && now < order[i + 1].ms) {
+								a = order[i]; b = order[i + 1];
+								spanStart = order[i].ms; spanEnd = order[i + 1].ms;
+								break;
+							}
+						}
+					}
+					var raw = Math.max(0, Math.min(1, (now - spanStart) / Math.max(1, spanEnd - spanStart)));
+					var smooth = raw * raw * (3 - 2 * raw);
+					syncPhaseAttributes(a.key, 'live');
+					return { a: PHASES[a.key], b: PHASES[b.key], t: smooth, key: a.key };
+				}
+
+				// ---- Atmospheric Sky / Horizon Backdrop Shader ----
+				var skyGeo = new THREE.PlaneGeometry(60, 40);
+				var skyMat = new THREE.ShaderMaterial({
+					uniforms: {
+						uTime: { value: 0 },
+						uHorizonColor: { value: new THREE.Color(0x161c36) },
+						uZenithColor: { value: new THREE.Color(0x05070f) },
+						uIntensity: { value: 0.0 },
+						uIsLight: { value: isDark ? 0.0 : 1.0 }
+					},
+					vertexShader: [
+						'varying vec2 vUv;',
+						'void main() {',
+						'  vUv = uv;',
+						'  gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);',
+						'}'
+					].join('\n'),
+					fragmentShader: [
+						'uniform float uTime;',
+						'uniform vec3 uHorizonColor;',
+						'uniform vec3 uZenithColor;',
+						'uniform float uIntensity;',
+						'uniform float uIsLight;',
+						'varying vec2 vUv;',
+						'void main() {',
+						'  float dist = length(vUv - vec2(0.5, 0.48));',
+						'  float radial = smoothstep(0.62, 0.05, dist);',
+						'  float horizon = smoothstep(0.75, 0.15, vUv.y) * smoothstep(0.0, 0.35, vUv.y);',
+						'  float mist = 0.92 + 0.08 * sin(vUv.x * 6.0 + uTime * 0.25);',
+						'  vec3 darkCol = mix(uZenithColor, uHorizonColor, horizon * 0.85 + radial * 0.25);',
+						'  vec3 lightCol = mix(vec3(0.957, 0.949, 0.933), uHorizonColor, 0.38);',
+						'  vec3 col = mix(darkCol, lightCol, uIsLight);',
+						'  float alpha = (radial * 0.55 + horizon * 0.45) * uIntensity * mist;',
+						'  alpha *= mix(1.0, 0.28, uIsLight);',
+						'  gl_FragColor = vec4(col, alpha);',
+						'}'
+					].join('\n'),
+					transparent: true,
+					depthWrite: false
+				});
+				var skyPlane = new THREE.Mesh(skyGeo, skyMat);
+				skyPlane.position.set(0, 0, -18);
+				scene.add(skyPlane);
+
+				// ---- Moon / Celestial Orb + Fresnel Atmospheric Corona ----
+				var celestialGroup = new THREE.Group();
+				celestialGroup.position.set(0, 0, -2);
+				function moonScaleFor(aspect) { return Math.min(1, 1.07 * aspect); }
+				var moonScale = moonScaleFor(camera.aspect);
+				celestialGroup.scale.set(moonScale, moonScale, moonScale);
+				scene.add(celestialGroup);
+
 				var loader = new THREE.TextureLoader();
 				loader.setCrossOrigin('anonymous');
-				// jsdelivr CDN (cached, compressed) — raw.githubusercontent.com
-				// sends no-cache headers so the texture re-downloads every visit.
 				var moonTex = loader.load('https://cdn.jsdelivr.net/gh/mrdoob/three.js@r159/examples/textures/planets/moon_1024.jpg');
 				var moonGeo = new THREE.SphereGeometry(1.9, 64, 64);
 				var moonMat = new THREE.MeshStandardMaterial({
 					map: moonTex,
-					roughness: 1,
-					metalness: 0,
+					bumpMap: moonTex,
+					bumpScale: 0.04,
+					roughness: 0.9,
+					metalness: 0.05,
 					emissive: new THREE.Color(isDark ? 0x1a1410 : 0x1a1d2e),
-					emissiveIntensity: 0.12
+					emissiveIntensity: 0.14
 				});
 				var moon = new THREE.Mesh(moonGeo, moonMat);
-				// Centered hero — pushed back in Z so it sits behind the content
-				// as a backdrop. At z=-2 (cam dist 7) the 1.9r sphere fills ~65%
-				// of viewport height: dominant but not overwhelming.
-				moon.position.set(0, 0, -2);
 				moon.rotation.z = 0.2;
-				// Responsive zoom: on portrait phones the visible width is much
-				// narrower than height (aspect < 1), so the fixed 3.8-unit moon
-				// overflows the sides. Scale by aspect so the moon always fits
-				// ~70% of visible width; capped at 1 so desktop is unchanged.
-				// GPU-side matrix scale — no layout cost, resize-safe.
-				function moonScaleFor(aspect) { return Math.min(1, 1.07 * aspect); }
-				var moonScale = moonScaleFor(camera.aspect);
-				moon.scale.set(moonScale, moonScale, moonScale);
-				scene.add(moon);
+				celestialGroup.add(moon);
 
-				// Lighting — theme-aware. Dark: dim dramatic. Light: moderate so
-				// the grey moon reads against silver without washing out.
-				var ambient = new THREE.AmbientLight(0xfff3ea, isDark ? 0.2 : 0.5);
+				var coronaGeo = new THREE.SphereGeometry(2.12, 64, 64);
+				var coronaMat = new THREE.ShaderMaterial({
+					uniforms: {
+						uColor: { value: new THREE.Color(0x9aa8d6) },
+						uIntensity: { value: 0.0 },
+						uTime: { value: 0 }
+					},
+					vertexShader: [
+						'varying vec3 vNormal;',
+						'varying vec3 vViewDir;',
+						'void main() {',
+						'  vec4 mv = modelViewMatrix * vec4(position, 1.0);',
+						'  vNormal = normalize(normalMatrix * normal);',
+						'  vViewDir = normalize(-mv.xyz);',
+						'  gl_Position = projectionMatrix * mv;',
+						'}'
+					].join('\n'),
+					fragmentShader: [
+						'uniform vec3 uColor;',
+						'uniform float uIntensity;',
+						'uniform float uTime;',
+						'varying vec3 vNormal;',
+						'varying vec3 vViewDir;',
+						'void main() {',
+						'  float fresnel = pow(1.0 - max(dot(vViewDir, -vNormal), 0.0), 3.4);',
+						'  float pulse = 0.92 + 0.08 * sin(uTime * 0.7);',
+						'  gl_FragColor = vec4(uColor, fresnel * uIntensity * pulse);',
+						'}'
+					].join('\n'),
+					side: THREE.BackSide,
+					transparent: true,
+					blending: isDark ? THREE.AdditiveBlending : THREE.NormalBlending,
+					depthWrite: false
+				});
+				var corona = new THREE.Mesh(coronaGeo, coronaMat);
+				celestialGroup.add(corona);
+
+				// ---- Celestial Astrolabe / Sacred Geometry Orbital Rings ----
+				var astrolabeGroup = new THREE.Group();
+				var ringMat = new THREE.MeshBasicMaterial({
+					color: 0xe4b592,
+					transparent: true,
+					opacity: 0,
+					depthWrite: false
+				});
+				var outerRing = new THREE.Mesh(new THREE.TorusGeometry(2.55, 0.007, 8, 128), ringMat);
+				outerRing.rotation.x = Math.PI * 0.42;
+				var innerRing = new THREE.Mesh(new THREE.TorusGeometry(2.28, 0.005, 8, 128), ringMat);
+				innerRing.rotation.x = Math.PI * 0.56;
+				innerRing.rotation.y = 0.35;
+
+				// Sacred Geometry Rub el Hizb (two interlocking 45°-offset squares)
+				var sqVerts = new Float32Array([
+					 2.28, 0, 0,   0,  2.28, 0,  -2.28, 0, 0,   0, -2.28, 0
+				]);
+				var sqGeo = new THREE.BufferGeometry();
+				sqGeo.setAttribute('position', new THREE.BufferAttribute(sqVerts, 3));
+				var sqMat = new THREE.LineBasicMaterial({
+					color: 0xe4b592,
+					transparent: true,
+					opacity: 0,
+					depthWrite: false
+				});
+				var sqA = new THREE.LineLoop(sqGeo, sqMat);
+				var sqB = new THREE.LineLoop(sqGeo, sqMat);
+				sqB.rotation.z = Math.PI * 0.25;
+				innerRing.add(sqA);
+				innerRing.add(sqB);
+
+				// 8-point Rub el Hizb orbital nodes on the outer ring
+				var nodeCount = 8;
+				var nodePos = new Float32Array(nodeCount * 3);
+				for (var n = 0; n < nodeCount; n++) {
+					var na = (n / nodeCount) * Math.PI * 2;
+					nodePos[n * 3] = Math.cos(na) * 2.55;
+					nodePos[n * 3 + 1] = Math.sin(na) * 2.55;
+					nodePos[n * 3 + 2] = 0;
+				}
+				var nodeGeo = new THREE.BufferGeometry();
+				nodeGeo.setAttribute('position', new THREE.BufferAttribute(nodePos, 3));
+				var nodeMat = new THREE.PointsMaterial({
+					color: 0xe4b592,
+					size: 0.055,
+					transparent: true,
+					opacity: 0,
+					depthWrite: false
+				});
+				var ringNodes = new THREE.Points(nodeGeo, nodeMat);
+				outerRing.add(ringNodes);
+
+				astrolabeGroup.add(outerRing);
+				astrolabeGroup.add(innerRing);
+				celestialGroup.add(astrolabeGroup);
+
+				// ---- Lighting ----
+				var ambient = new THREE.AmbientLight(0x1d233a, 0.24);
 				scene.add(ambient);
-				var dirLight = new THREE.DirectionalLight(0xfff3ea, isDark ? 0.7 : 0.4);
-				dirLight.position.set(-3, 2, 2);
+				var dirLight = new THREE.DirectionalLight(0xfff3ea, isDark ? 0.85 : 0.5);
+				dirLight.position.set(-3.2, 2.4, 2.5);
 				scene.add(dirLight);
 
-				// Galaxy + background stars — both themes.
-				// Dark: additive blending (bright glowing particles on black).
-				// Light: normal blending (dark ink particles on silver — crisp,
-				// reliable across GPUs; subtractive produced muddy washed results).
+				// ---- Spiral Galaxy (Custom Shader for soft glowing stars) ----
 				var blend = isDark ? THREE.AdditiveBlending : THREE.NormalBlending;
-				var bgStarColor = isDark ? 0xfff3ea : 0x3a3a3c;
-
-				// Spiral disk: 3 arms, warm core fading to cool nebula rim.
-				// Light theme: dark navy/slate ink — reads as a constellation
-				// chart on silver, not a muddy smudge.
 				var galaxyCount = 2500;
 				var galaxyGeo = new THREE.BufferGeometry();
 				var gPos = new Float32Array(galaxyCount * 3);
 				var gCol = new Float32Array(galaxyCount * 3);
+				var gSize = new Float32Array(galaxyCount);
 				var maxR = 16, arms = 3;
 				var cInner = isDark ? new THREE.Color(0xfff3ea) : new THREE.Color(0x1a1d2e);
 				var cMid   = isDark ? new THREE.Color(0xe4b592) : new THREE.Color(0x2d3450);
 				var cOuter = isDark ? new THREE.Color(0x6b6398) : new THREE.Color(0x4a5278);
 				for (var i = 0; i < galaxyCount; i++) {
-					var r = Math.pow(Math.random(), 0.6) * maxR; // denser core
+					var r = Math.pow(Math.random(), 0.6) * maxR;
 					var arm = (i % arms) * (2 * Math.PI / arms);
 					var ang = arm + r * 0.35 + (Math.random() - 0.5) * 0.7;
 					var jit = (Math.random() - 0.5) * 1.8;
 					gPos[i*3]   = Math.cos(ang) * r + jit;
-					gPos[i*3+1] = (Math.random() - 0.5) * 1.4 * (1 - r/maxR); // thin disk
+					gPos[i*3+1] = (Math.random() - 0.5) * 1.4 * (1 - r/maxR);
 					gPos[i*3+2] = Math.sin(ang) * r + jit;
-					var t = r / maxR;
-					var col = t < 0.5
-						? cInner.clone().lerp(cMid, t * 2)
-						: cMid.clone().lerp(cOuter, (t - 0.5) * 2);
+					var tCol = r / maxR;
+					var col = tCol < 0.5
+						? cInner.clone().lerp(cMid, tCol * 2)
+						: cMid.clone().lerp(cOuter, (tCol - 0.5) * 2);
 					gCol[i*3] = col.r; gCol[i*3+1] = col.g; gCol[i*3+2] = col.b;
+					gSize[i] = 1.2 + Math.random() * 2.2;
 				}
 				galaxyGeo.setAttribute('position', new THREE.BufferAttribute(gPos, 3));
-				galaxyGeo.setAttribute('color', new THREE.BufferAttribute(gCol, 3));
-				var galaxyMat = new THREE.PointsMaterial({
-					size: 0.07, transparent: true, opacity: 0, vertexColors: true,
-					blending: blend, depthWrite: false, sizeAttenuation: true
+				galaxyGeo.setAttribute('aColor', new THREE.BufferAttribute(gCol, 3));
+				galaxyGeo.setAttribute('aSize', new THREE.BufferAttribute(gSize, 1));
+				var galaxyMat = new THREE.ShaderMaterial({
+					uniforms: { uOpacity: { value: 0 } },
+					vertexShader: [
+						'attribute vec3 aColor;',
+						'attribute float aSize;',
+						'varying vec3 vColor;',
+						'void main() {',
+						'  vColor = aColor;',
+						'  vec4 mv = modelViewMatrix * vec4(position, 1.0);',
+						'  gl_PointSize = aSize * (160.0 / -mv.z);',
+						'  gl_Position = projectionMatrix * mv;',
+						'}'
+					].join('\n'),
+					fragmentShader: [
+						'uniform float uOpacity;',
+						'varying vec3 vColor;',
+						'void main() {',
+						'  float d = length(gl_PointCoord - 0.5);',
+						'  if (d > 0.5) discard;',
+						'  float core = smoothstep(0.5, 0.0, d);',
+						'  gl_FragColor = vec4(vColor, core * uOpacity);',
+						'}'
+					].join('\n'),
+					transparent: true,
+					blending: blend,
+					depthWrite: false
 				});
 				var galaxy = new THREE.Points(galaxyGeo, galaxyMat);
 				galaxy.position.set(0, 0, -8);
-				galaxy.rotation.x = 0.35; // tilt to see the disk face
+				galaxy.rotation.x = 0.35;
 				scene.add(galaxy);
 
-				// Background star shell — distant uniform sphere for depth.
-				// Custom shader: per-star twinkle (phase) + soft round points.
-				// GPU-side, costs nothing on the CPU vs animating 1500 points
-				// from JS each frame. uTime drives a sin twinkle per vertex.
+				// ---- Background Star Shell ----
+				var bgStarColor = isDark ? 0xfff3ea : 0x3a3a3c;
 				var bgCount = 1500;
 				var bgGeo = new THREE.BufferGeometry();
 				var bPos = new Float32Array(bgCount * 3);
@@ -230,30 +558,66 @@ templ MoonCanvas() {
 				var bgStars = new THREE.Points(bgGeo, bgMat);
 				scene.add(bgStars);
 
-				// GSAP entrance — moon fades in, galaxy + stars twinkle on, content staggers.
-				// Light theme: lower opacity so dark ink particles stay subtle on silver.
-				var targetOpacity = isDark ? 1 : 0.7;
-				var galaxyTarget = isDark ? 0.85 : 0.45;
-				var bgTarget = isDark ? 0.55 : 0.3;
-				var tl = gsap.timeline({ defaults: { ease: "power3.out" } });
-				tl.to(canvas, { opacity: targetOpacity, duration: 2.5 })
-				  .from(moon.position, { y: -2.5, duration: 3, ease: "power2.out" }, 0)
-				  .from(moon.scale, { x: moonScale * 0.6, y: moonScale * 0.6, z: moonScale * 0.6, duration: 2.5, ease: "back.out(1.2)" }, 0)
-				  .to(galaxyMat, { opacity: galaxyTarget, duration: 1.8 }, "-=1.5")
-				  .to(bgMat.uniforms.uOpacity, { value: bgTarget, duration: 1.5 }, "-=1.2");
+				// ---- Tasbih / Atmospheric Dust Motes ----
+				var dustCount = 160;
+				var dustGeo = new THREE.BufferGeometry();
+				var dPos = new Float32Array(dustCount * 3);
+				var dPhase = new Float32Array(dustCount);
+				for (var k = 0; k < dustCount; k++) {
+					var da = Math.random() * Math.PI * 2;
+					var dr = 2.4 + Math.random() * 5.0;
+					dPos[k*3]   = Math.cos(da) * dr;
+					dPos[k*3+1] = (Math.random() - 0.5) * 6.0;
+					dPos[k*3+2] = Math.sin(da) * dr * 0.5 - 2.0;
+					dPhase[k] = Math.random() * 6.2831;
+				}
+				dustGeo.setAttribute('position', new THREE.BufferAttribute(dPos, 3));
+				dustGeo.setAttribute('aPhase', new THREE.BufferAttribute(dPhase, 1));
+				var dustMat = new THREE.ShaderMaterial({
+					uniforms: {
+						uTime: { value: 0 },
+						uColor: { value: new THREE.Color(0xe4b592) },
+						uOpacity: { value: 0 }
+					},
+					vertexShader: [
+						'attribute float aPhase;',
+						'uniform float uTime;',
+						'varying float vAlpha;',
+						'void main() {',
+						'  vec3 p = position;',
+						'  p.y += sin(uTime * 0.35 + aPhase) * 0.45;',
+						'  p.x += cos(uTime * 0.25 + aPhase) * 0.25;',
+						'  vAlpha = 0.4 + 0.6 * sin(uTime * 0.9 + aPhase);',
+						'  vec4 mv = modelViewMatrix * vec4(p, 1.0);',
+						'  gl_PointSize = 10.0 / -mv.z;',
+						'  gl_Position = projectionMatrix * mv;',
+						'}'
+					].join('\n'),
+					fragmentShader: [
+						'uniform vec3 uColor;',
+						'uniform float uOpacity;',
+						'varying float vAlpha;',
+						'void main() {',
+						'  float d = length(gl_PointCoord - 0.5);',
+						'  if (d > 0.5) discard;',
+						'  gl_FragColor = vec4(uColor, smoothstep(0.5, 0.0, d) * uOpacity * vAlpha);',
+						'}'
+					].join('\n'),
+					transparent: true,
+					blending: blend,
+					depthWrite: false
+				});
+				var dust = new THREE.Points(dustGeo, dustMat);
+				scene.add(dust);
 
-				// GSAP content reveal — compass-anchored staging.
-				// The compass is the hero focal point: it lands first with an
-				// overshoot scale-in, then clock (left) + next-prayer (right)
-				// flank it, then the prayer picker and bottom nav cascade in.
-				// On the onboarding screen (no .hero-cell-center) we fall back
-				// to a flat stagger of .hero-reveal cards.
-				// The bottom nav wrap carries .hero-reveal so it fades in with
-				// the rest; the inner .hero-nav is controlled by CSS collapse
-				// (no GSAP inline opacity here, which would fight the collapse).
-				// ponytail: per-load reveal (no just-onboarded flag) — the moon
-				// already fades in every load, so this is consistent, and a
-				// one-shot cookie for one animation isn't worth the state.
+				// ---- GSAP Entrance ----
+				var entranceGain = { value: 0 };
+				var tl = gsap.timeline({ defaults: { ease: "power3.out" } });
+				tl.to(canvas, { opacity: isDark ? 1 : 0.72, duration: 2.2 })
+				  .from(celestialGroup.position, { y: -2.2, duration: 2.8, ease: "power2.out" }, 0)
+				  .from(celestialGroup.scale, { x: moonScale * 0.62, y: moonScale * 0.62, z: moonScale * 0.62, duration: 2.4, ease: "back.out(1.2)" }, 0)
+				  .to(entranceGain, { value: 1, duration: 2.0 }, 0.4);
+
 				var compassCell = document.querySelector('.hero-cell-center');
 				if (compassCell) {
 					var heroTl = gsap.timeline({ defaults: { ease: "power3.out" } });
@@ -268,10 +632,48 @@ templ MoonCanvas() {
 					});
 				}
 
-				// Cinematic camera: slow breathing drift + lerped mouse parallax.
-				// lookAt origin keeps the centered moon anchored while the camera
-				// orbits subtly — gives depth/parallax (stars shift, moon barely).
-				// Pointer target is lerped (0.04) so motion stays smooth, never 1:1.
+				// ---- Theme Reactivity ----
+				function applyTheme() {
+					isDark = checkIsDark();
+					var b = isDark ? THREE.AdditiveBlending : THREE.NormalBlending;
+					coronaMat.blending = b; coronaMat.needsUpdate = true;
+					galaxyMat.blending = b; galaxyMat.needsUpdate = true;
+					bgMat.blending = b; bgMat.needsUpdate = true;
+					dustMat.blending = b; dustMat.needsUpdate = true;
+					bgMat.uniforms.uColor.value.setHex(isDark ? 0xfff3ea : 0x3a3a3c);
+					skyMat.uniforms.uIsLight.value = isDark ? 0.0 : 1.0;
+					canvas.style.opacity = isDark ? '1' : '0.72';
+				}
+				var themeObserver = new MutationObserver(applyTheme);
+				themeObserver.observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
+				matchMedia('(prefers-color-scheme: dark)').addEventListener('change', applyTheme);
+
+				// ---- Reusable scratch objects for zero-GC animation loop ----
+				var tmpC1 = new THREE.Color();
+				var tmpC2 = new THREE.Color();
+				var tmpV1 = new THREE.Vector3();
+				var tmpV2 = new THREE.Vector3();
+				var curPhase = {
+					lightPos: new THREE.Vector3(-3.2, 2.4, 2.5),
+					lightColor: new THREE.Color(0xfff3ea),
+					lightInt: 0.85,
+					ambientColor: new THREE.Color(0x1d233a),
+					ambientInt: 0.24,
+					emissiveColor: new THREE.Color(0x1a1410),
+					emissiveInt: 0.14,
+					coronaColor: new THREE.Color(0x9aa8d6),
+					coronaInt: 0.55,
+					horizonColor: new THREE.Color(0x161c36),
+					zenithColor: new THREE.Color(0x05070f),
+					skyInt: 0.22,
+					ringColor: new THREE.Color(0xe4b592),
+					ringOpacity: 0.35,
+					ringTilt: 0.65,
+					starsOpacity: 0.78,
+					galaxyOpacity: 0.88,
+					dustOpacity: 0.25
+				};
+
 				var clock = new THREE.Clock();
 				var mouse = { x: 0, y: 0, tx: 0, ty: 0 };
 				window.addEventListener('pointermove', function(e) {
@@ -279,44 +681,119 @@ templ MoonCanvas() {
 					mouse.ty = (e.clientY / window.innerHeight - 0.5) * 2;
 				});
 
-				// Very slow moon rotation + galaxy drift + star twinkle + cam
 				var running = true;
 				function animate() {
 					if (!running) return;
 					requestAnimationFrame(animate);
+					var dt = Math.min(clock.getDelta(), 0.1);
 					var t = clock.getElapsedTime();
+					var damp = 1 - Math.exp(-dt * 2.5);
+					var gain = entranceGain.value;
+
+					// Blend current prayer phase
+					var blendState = getPhaseBlend();
+					var A = blendState.a, B = blendState.b, u = blendState.t;
+					var themeMul = isDark ? 1.0 : 0.55;
+
+					tmpV1.set(A.lightPos[0], A.lightPos[1], A.lightPos[2]);
+					tmpV2.set(B.lightPos[0], B.lightPos[1], B.lightPos[2]);
+					tmpV1.lerp(tmpV2, u);
+					curPhase.lightPos.lerp(tmpV1, damp);
+					dirLight.position.copy(curPhase.lightPos);
+
+					tmpC1.setHex(A.lightColor).lerp(tmpC2.setHex(B.lightColor), u);
+					curPhase.lightColor.lerp(tmpC1, damp);
+					dirLight.color.copy(curPhase.lightColor);
+					curPhase.lightInt += ((A.lightInt + (B.lightInt - A.lightInt) * u) * (isDark ? 1.0 : 0.65) - curPhase.lightInt) * damp;
+					dirLight.intensity = curPhase.lightInt;
+
+					tmpC1.setHex(A.ambientColor).lerp(tmpC2.setHex(B.ambientColor), u);
+					curPhase.ambientColor.lerp(tmpC1, damp);
+					ambient.color.copy(curPhase.ambientColor);
+					curPhase.ambientInt += ((A.ambientInt + (B.ambientInt - A.ambientInt) * u) * (isDark ? 1.0 : 1.45) - curPhase.ambientInt) * damp;
+					ambient.intensity = curPhase.ambientInt;
+
+					tmpC1.setHex(A.emissiveColor).lerp(tmpC2.setHex(B.emissiveColor), u);
+					curPhase.emissiveColor.lerp(tmpC1, damp);
+					moonMat.emissive.copy(curPhase.emissiveColor);
+					curPhase.emissiveInt += ((A.emissiveInt + (B.emissiveInt - A.emissiveInt) * u) - curPhase.emissiveInt) * damp;
+					moonMat.emissiveIntensity = curPhase.emissiveInt + Math.sin(t * 0.5) * 0.03;
+
+					tmpC1.setHex(A.coronaColor).lerp(tmpC2.setHex(B.coronaColor), u);
+					curPhase.coronaColor.lerp(tmpC1, damp);
+					coronaMat.uniforms.uColor.value.copy(curPhase.coronaColor);
+					curPhase.coronaInt += ((A.coronaInt + (B.coronaInt - A.coronaInt) * u) * (isDark ? 1.0 : 0.35) - curPhase.coronaInt) * damp;
+					coronaMat.uniforms.uIntensity.value = curPhase.coronaInt * gain;
+					coronaMat.uniforms.uTime.value = t;
+
+					tmpC1.setHex(A.horizonColor).lerp(tmpC2.setHex(B.horizonColor), u);
+					curPhase.horizonColor.lerp(tmpC1, damp);
+					skyMat.uniforms.uHorizonColor.value.copy(curPhase.horizonColor);
+					tmpC1.setHex(A.zenithColor).lerp(tmpC2.setHex(B.zenithColor), u);
+					curPhase.zenithColor.lerp(tmpC1, damp);
+					skyMat.uniforms.uZenithColor.value.copy(curPhase.zenithColor);
+					curPhase.skyInt += ((A.skyInt + (B.skyInt - A.skyInt) * u) - curPhase.skyInt) * damp;
+					skyMat.uniforms.uIntensity.value = curPhase.skyInt * gain;
+					skyMat.uniforms.uTime.value = t;
+
+					tmpC1.setHex(A.ringColor).lerp(tmpC2.setHex(B.ringColor), u);
+					curPhase.ringColor.lerp(tmpC1, damp);
+					ringMat.color.copy(curPhase.ringColor);
+					sqMat.color.copy(curPhase.ringColor);
+					nodeMat.color.copy(curPhase.ringColor);
+					curPhase.ringOpacity += ((A.ringOpacity + (B.ringOpacity - A.ringOpacity) * u) * (isDark ? 1.0 : 0.65) - curPhase.ringOpacity) * damp;
+					ringMat.opacity = curPhase.ringOpacity * gain;
+					sqMat.opacity = curPhase.ringOpacity * 0.45 * gain;
+					nodeMat.opacity = Math.min(1, curPhase.ringOpacity * 1.4) * gain;
+					curPhase.ringTilt += ((A.ringTilt + (B.ringTilt - A.ringTilt) * u) - curPhase.ringTilt) * damp;
+
+					curPhase.starsOpacity += ((A.starsOpacity + (B.starsOpacity - A.starsOpacity) * u) * themeMul - curPhase.starsOpacity) * damp;
+					bgMat.uniforms.uOpacity.value = curPhase.starsOpacity * gain;
 					bgMat.uniforms.uTime.value = t;
+
+					curPhase.galaxyOpacity += ((A.galaxyOpacity + (B.galaxyOpacity - A.galaxyOpacity) * u) * themeMul - curPhase.galaxyOpacity) * damp;
+					galaxyMat.uniforms.uOpacity.value = curPhase.galaxyOpacity * gain;
+
+					curPhase.dustOpacity += ((A.dustOpacity + (B.dustOpacity - A.dustOpacity) * u) * themeMul - curPhase.dustOpacity) * damp;
+					dustMat.uniforms.uOpacity.value = curPhase.dustOpacity * gain;
+					dustMat.uniforms.uTime.value = t;
+
+					// Camera drift + parallax
 					mouse.x += (mouse.tx - mouse.x) * 0.04;
 					mouse.y += (mouse.ty - mouse.y) * 0.04;
 					camera.position.x = Math.sin(t * 0.08) * 0.4 + mouse.x * 0.6;
 					camera.position.y = Math.cos(t * 0.06) * 0.25 - mouse.y * 0.4;
 					camera.lookAt(0, 0, 0);
-					moon.rotation.y += 0.0006;
-					moon.material.emissiveIntensity = 0.12 + Math.sin(t * 0.5) * 0.04;
-					if (galaxy) galaxy.rotation.y += 0.00008;
-					if (bgStars) bgStars.rotation.y += 0.00002;
+
+					// Celestial motion
+					moon.rotation.y += dt * 0.035;
+					astrolabeGroup.rotation.x = curPhase.ringTilt + Math.sin(t * 0.12) * 0.05;
+					astrolabeGroup.rotation.y += dt * 0.06;
+					outerRing.rotation.z += dt * 0.04;
+					innerRing.rotation.z -= dt * 0.055;
+					galaxy.rotation.y += dt * 0.008;
+					bgStars.rotation.y += dt * 0.002;
+
 					renderer.render(scene, camera);
 				}
 				animate();
 
-				// Pause when tab hidden
 				document.addEventListener('visibilitychange', function() {
 					if (document.hidden) {
 						running = false;
 					} else if (!running) {
+						clock.getDelta();
 						running = true;
 						animate();
 					}
 				});
 
-				// Resize
 				window.addEventListener('resize', function() {
 					camera.aspect = window.innerWidth / window.innerHeight;
 					camera.updateProjectionMatrix();
 					renderer.setSize(window.innerWidth, window.innerHeight);
-					// Keep the moon fitted on rotation / orientation change.
 					var s = moonScaleFor(camera.aspect);
-					moon.scale.set(s, s, s);
+					celestialGroup.scale.set(s, s, s);
 				});
 			}).catch(function(e) {
 				console.warn('moon load failed:', e);
@@ -325,11 +802,8 @@ templ MoonCanvas() {
 	</script>
 }
 
-// ThemeToggle — glass island pill, top-right (safe-area aware). Both icons
-// stay visible; a sliding accent indicator eases between sun (light) and moon
-// (dark). --active (0=light, 1=dark) is set by syncThemeIcon() — same pattern
-// as the prayer-picker segmented control, so the two instruments share a
-// language. backdrop-blur gives the iOS control-center "floating glass" feel.
+// ThemeToggle — glass island pill, top-centered. Both crisp SVG icons stay
+// visible; a sliding accent indicator eases between sun (light) and moon (dark).
 templ ThemeToggle() {
 	<button
 		class="theme-toggle"
@@ -338,8 +812,17 @@ templ ThemeToggle() {
 		onclick="toggleTheme()"
 	>
 		<span class="theme-toggle-indicator" aria-hidden="true"></span>
-		<span class="theme-toggle-icon icon-sun" aria-hidden="true">☀</span>
-		<span class="theme-toggle-icon icon-moon" aria-hidden="true">☾</span>
+		<span class="theme-toggle-icon icon-sun" aria-hidden="true">
+			<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+				<circle cx="12" cy="12" r="4"></circle>
+				<path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41"></path>
+			</svg>
+		</span>
+		<span class="theme-toggle-icon icon-moon" aria-hidden="true">
+			<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+				<path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path>
+			</svg>
+		</span>
 	</button>
 }
 
@@ -395,18 +878,14 @@ templ Scripts() {
 		function toggleTheme() {
 			var html = document.documentElement;
 			var current = html.getAttribute('data-theme');
-			var next;
-			if (current === 'light') next = 'dark';
-			else if (current === 'dark') next = 'light';
-			else next = (matchMedia('(prefers-color-scheme: dark)').matches) ? 'light' : 'dark';
+			var next = (current === 'light') ? 'dark' : 'light';
 			html.setAttribute('data-theme', next);
 			try { localStorage.setItem('ws_theme', next); } catch (e) {}
+			syncThemeIcon();
 		}
 
 		function syncThemeIcon() {
-			var isDark = document.documentElement.getAttribute('data-theme') === 'dark' ||
-				(!document.documentElement.hasAttribute('data-theme') &&
-				 matchMedia('(prefers-color-scheme: dark)').matches);
+			var isDark = document.documentElement.getAttribute('data-theme') !== 'light';
 			var toggle = document.querySelector('.theme-toggle');
 			var moon = document.querySelector('.theme-toggle .icon-moon');
 			var sun = document.querySelector('.theme-toggle .icon-sun');
@@ -416,7 +895,6 @@ templ Scripts() {
 			if (sun)  { sun.classList.toggle('is-active', !isDark); sun.classList.toggle('is-inactive', isDark); }
 		}
 		syncThemeIcon();
-		matchMedia('(prefers-color-scheme: dark)').addEventListener('change', syncThemeIcon);
 
 		function openDrawer() {
 			document.getElementById('drawer').classList.add('is-open');
@@ -477,10 +955,90 @@ templ Scripts() {
 		});
 
 		// ---- Prayer picker segmented control ----
-		// 5 tappable segments (Subuh..Isya). Clicking a segment eases the
-		// accent underline indicator to it (--active on #prayer-picker) and
-		// updates #next-prayer-* with that prayer's name, time, and a live
-		// countdown. A 1s interval keeps the countdown fresh.
+		// ---- Precision Chronometer & Dual-Calendar (Gregorian + Hijriyah) ----
+		(function() {
+			var gregFmt, hijriFmt;
+			try {
+				gregFmt = new Intl.DateTimeFormat('id-ID', {
+					weekday: 'short', day: '2-digit', month: 'short', year: 'numeric'
+				});
+			} catch (e) {}
+			try {
+				hijriFmt = new Intl.DateTimeFormat('id-ID-u-ca-islamic-umalqura', {
+					day: 'numeric', month: 'long', year: 'numeric'
+				});
+			} catch (e) {
+				try {
+					hijriFmt = new Intl.DateTimeFormat('id-ID-u-ca-islamic', {
+						day: 'numeric', month: 'long', year: 'numeric'
+					});
+				} catch (e2) {}
+			}
+
+			function resolveTzShort(d) {
+				try {
+					var tzName = Intl.DateTimeFormat().resolvedOptions().timeZone || '';
+					if (tzName === 'Asia/Jakarta' || tzName === 'Asia/Pontianak') return 'WIB';
+					if (tzName === 'Asia/Makassar') return 'WITA';
+					if (tzName === 'Asia/Jayapura') return 'WIT';
+				} catch (e) {}
+				var off = -d.getTimezoneOffset();
+				var sign = off >= 0 ? '+' : '-';
+				var h = Math.floor(Math.abs(off) / 60);
+				return 'UTC' + sign + h;
+			}
+
+			var lastDayKey = '';
+			function pad2(n) { return n < 10 ? '0' + n : String(n); }
+
+			function tickChronometer() {
+				var root = document.getElementById('chronometer-root');
+				if (!root) return;
+				var now = new Date();
+				var hmEl = document.getElementById('chrono-hm');
+				var ssEl = document.getElementById('chrono-ss');
+				var barEl = document.getElementById('chrono-sec-bar');
+				var colonEl = document.getElementById('chrono-colon');
+				var phaseEl = document.getElementById('chrono-phase-label');
+				var timeEl = document.getElementById('chrono-time');
+
+				var hh = pad2(now.getHours());
+				var mm = pad2(now.getMinutes());
+				var ss = pad2(now.getSeconds());
+				if (hmEl) hmEl.textContent = hh + ':' + mm;
+				if (ssEl) ssEl.textContent = ss;
+				if (timeEl) timeEl.setAttribute('datetime', now.toISOString());
+
+				var secFrac = (now.getSeconds() + now.getMilliseconds() / 1000) / 60;
+				if (barEl) barEl.style.transform = 'scaleX(' + secFrac.toFixed(4) + ')';
+				if (colonEl) colonEl.style.opacity = (now.getMilliseconds() < 500) ? '0.85' : '0.35';
+
+				var phaseAttr = document.documentElement.getAttribute('data-prayer-phase');
+				if (phaseEl) {
+					phaseEl.textContent = phaseAttr ? ('WAKTU // ' + phaseAttr.toUpperCase()) : 'WAKTU LOKAL';
+				}
+
+				var dayKey = now.getFullYear() + '-' + now.getMonth() + '-' + now.getDate();
+				if (dayKey !== lastDayKey) {
+					lastDayKey = dayKey;
+					var tzEl = document.getElementById('chrono-tz');
+					var gregEl = document.getElementById('chrono-date-greg');
+					var hijriEl = document.getElementById('chrono-date-hijri');
+					if (tzEl) tzEl.textContent = resolveTzShort(now);
+					if (gregEl) {
+						gregEl.textContent = gregFmt ? gregFmt.format(now) : now.toDateString();
+					}
+					if (hijriEl && hijriFmt) {
+						hijriEl.textContent = hijriFmt.format(now);
+					}
+				}
+			}
+
+			tickChronometer();
+			setInterval(tickChronometer, 250);
+		})();
+
+		// ---- Prayer picker segmented control ----
 		function prayerStops() {
 			return document.querySelectorAll('[data-idx]');
 		}
@@ -496,10 +1054,13 @@ templ Scripts() {
 			if (!stop) return;
 
 			var label = stop.getAttribute('data-label');
+			var timeStr = stop.getAttribute('data-time');
 			var iso = stop.getAttribute('data-iso');
 
 			var nameEl = document.getElementById('next-prayer-name');
 			if (nameEl) nameEl.textContent = label;
+			var timeBadgeEl = document.getElementById('next-prayer-time');
+			if (timeBadgeEl && timeStr) timeBadgeEl.textContent = timeStr;
 
 			stops.forEach(function(s, i) {
 				s.classList.toggle('text-accent', i === idx);
@@ -519,6 +1080,7 @@ templ Scripts() {
 		function updatePrayerCountdown(iso) {
 			var cdEl = document.getElementById('next-prayer-countdown');
 			var labelEl = document.getElementById('next-prayer-label');
+			var barEl = document.getElementById('next-prayer-bar');
 			if (!cdEl) return;
 			var target = new Date(iso);
 			var now = new Date();
@@ -526,11 +1088,12 @@ templ Scripts() {
 			var absMs = Math.abs(diffMs);
 			var h = Math.floor(absMs / 3600000);
 			var m = Math.floor((absMs % 3600000) / 60000);
+			var s = Math.floor((absMs % 60000) / 1000);
 			var text;
 			if (absMs < 60000) {
-				text = 'sekarang';
+				text = diffMs > 0 ? (s + ' dtk') : 'sekarang';
 			} else if (h === 0) {
-				text = m + ' mnt';
+				text = m + ' mnt ' + s + ' dtk';
 			} else if (m === 0) {
 				text = h + ' jam';
 			} else {
@@ -539,9 +1102,14 @@ templ Scripts() {
 			if (diffMs > 0) {
 				text = 'dalam ' + text;
 				if (labelEl) labelEl.textContent = 'sholat berikutnya';
+				if (barEl) {
+					var prog = 1 - Math.min(1, diffMs / (6 * 3600000));
+					barEl.style.transform = 'scaleX(' + Math.max(0.06, prog).toFixed(3) + ')';
+				}
 			} else {
 				text = text + ' lalu';
-				if (labelEl) labelEl.textContent = 'sholat';
+				if (labelEl) labelEl.textContent = 'waktu sholat';
+				if (barEl) barEl.style.transform = 'scaleX(1)';
 			}
 			cdEl.textContent = text;
 		}
@@ -552,11 +1120,14 @@ templ Scripts() {
 			if (!picker) return;
 			pickPrayer(picker.getAttribute('data-active') || '0');
 
-			// Click any segment to jump to that prayer.
+			// Click any segment to jump to that prayer and preview its 3D sky phase.
 			document.addEventListener('click', function(e) {
 				var stop = e.target.closest('.prayer-segment');
 				if (!stop) return;
 				setPrayerPicker(stop.getAttribute('data-idx'));
+				if (window.wsPreviewPrayerPhase) {
+					window.wsPreviewPrayerPhase(stop.getAttribute('data-label'));
+				}
 			});
 
 			setInterval(function() {

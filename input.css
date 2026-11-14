@@ -29,22 +29,22 @@
   --color-shadow: rgba(0, 0, 0, 0.6);
 }
 
-/* ---- Light theme — silver canvas, dark ink particles, warm accent ---- */
+/* ---- Light theme — warm alabaster canvas, brushed bronze accent, crisp ink ---- */
 :root[data-theme="light"] {
-  --color-bg: #f5f5f7;
+  --color-bg: #f4f2ee;
   --color-surface: #ffffff;
-  --color-surface-2: #ebebed;
-  --color-border: rgba(0, 0, 0, 0.1);
-  --color-border-2: rgba(0, 0, 0, 0.06);
-  --color-fg: #1d1d1f;
-  --color-fg-muted: #6e6e73;
-  --color-fg-dim: rgba(29, 29, 31, 0.4);
-  --color-accent: #b07845;
-  --color-accent-2: #8a5d33;
-  --color-accent-soft: rgba(176, 120, 69, 0.12);
-  --color-pop: #c41e1e;
-  --color-pop-soft: rgba(196, 30, 30, 0.08);
-  --color-shadow: rgba(0, 0, 0, 0.08);
+  --color-surface-2: #eae6df;
+  --color-border: rgba(24, 24, 27, 0.11);
+  --color-border-2: rgba(24, 24, 27, 0.06);
+  --color-fg: #18181b;
+  --color-fg-muted: #5c5c66;
+  --color-fg-dim: rgba(24, 24, 27, 0.44);
+  --color-accent: #9c6635;
+  --color-accent-2: #7d4f26;
+  --color-accent-soft: rgba(156, 102, 53, 0.11);
+  --color-pop: #b91c1c;
+  --color-pop-soft: rgba(185, 28, 28, 0.08);
+  --color-shadow: rgba(24, 20, 14, 0.09);
 }
 
 /* ---- System dark preference ---- */
@@ -199,11 +199,22 @@
     pointer-events: none;
   }
 
-  /* Compass instrument — dark depth shadow only (keeps fine ticks crisp
-     against the eclipsed moon). Accent glow is applied per-element on the
-     needle and qibla marker so the thin tick/numeral lines stay sharp. */
+  /* Compass instrument — dark depth shadow in dark mode; crisp soft elevation in light mode */
   .compass-dial {
     filter: drop-shadow(0 1px 4px rgba(0,0,0,0.9));
+  }
+  :root[data-theme="light"] .viewfinder-full::before {
+    background: color-mix(in srgb, var(--color-surface) 72%, transparent);
+    backdrop-filter: blur(10px) saturate(125%);
+    -webkit-backdrop-filter: blur(10px) saturate(125%);
+    border: 1px solid var(--color-border);
+    box-shadow:
+      inset 0 1px 0 rgba(255, 255, 255, 0.9),
+      inset 0 0 24px rgba(156, 102, 53, 0.06),
+      0 12px 32px -14px rgba(24, 20, 14, 0.14);
+  }
+  :root[data-theme="light"] .compass-dial {
+    filter: drop-shadow(0 1px 2px rgba(24, 20, 14, 0.14));
   }
   .compass-needle {
     filter: drop-shadow(0 0 3px var(--color-accent-soft));
@@ -309,13 +320,181 @@
 
   /* Scanline / mission control terminal effect for clock */
   .terminal-glow {
-    text-shadow: 0 0 20px var(--color-accent-soft);
+    text-shadow: 0 0 24px var(--color-accent-soft);
+  }
+
+  /* ---- Precision Chronometer Instrument ---- */
+  .chronometer {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.35rem;
+    min-width: 190px;
+  }
+  @media (min-width: 768px) {
+    .chronometer {
+      align-items: flex-start;
+    }
+  }
+  .chrono-header {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.45rem;
+    font-family: var(--font-mono);
+    font-size: 10px;
+    letter-spacing: 0.25em;
+    text-transform: uppercase;
+    color: var(--color-fg-dim);
+  }
+  .chrono-live-dot {
+    width: 6px;
+    height: 6px;
+    border-radius: 9999px;
+    background: var(--color-accent);
+    box-shadow: 0 0 8px var(--color-accent);
+    animation: chrono-pulse 2s ease-in-out infinite;
+  }
+  @keyframes chrono-pulse {
+    0%, 100% { opacity: 0.45; transform: scale(0.92); }
+    50% { opacity: 1; transform: scale(1.08); }
+  }
+  .chrono-tz {
+    padding: 0.08rem 0.35rem;
+    border: 1px solid var(--color-border);
+    background: var(--color-accent-soft);
+    color: var(--color-accent);
+    font-size: 9px;
+    letter-spacing: 0.14em;
+    line-height: 1.2;
+  }
+  .chrono-time-row {
+    display: inline-flex;
+    align-items: baseline;
+    gap: 0.15rem;
+    font-variant-numeric: tabular-nums;
+    line-height: 1;
+    letter-spacing: -0.02em;
+  }
+  .chrono-hm {
+    font-family: var(--font-display);
+    font-size: 2.25rem;
+    font-weight: 700;
+    color: var(--color-fg);
+    letter-spacing: -0.03em;
+  }
+  @media (min-width: 768px) {
+    .chrono-hm {
+      font-size: 2.75rem;
+    }
+  }
+  .chrono-sec-wrap {
+    display: inline-flex;
+    align-items: baseline;
+    font-family: var(--font-mono);
+    font-size: 0.95rem;
+    font-weight: 400;
+    color: var(--color-accent);
+    margin-left: 0.1rem;
+  }
+  .chrono-colon {
+    opacity: 0.7;
+    margin-right: 0.05rem;
+    transition: opacity 0.15s ease;
+  }
+  .chrono-progress-track,
+  .next-prayer-progress-track {
+    position: relative;
+    width: 100%;
+    max-width: 185px;
+    height: 1.5px;
+    background: var(--color-border);
+    overflow: hidden;
+    margin-block: 0.15rem;
+  }
+  .chrono-progress-fill,
+  .next-prayer-progress-fill {
+    display: block;
+    height: 100%;
+    width: 100%;
+    background: var(--color-accent);
+    transform-origin: left center;
+    transform: scaleX(0);
+    transition: transform 0.15s linear;
+    will-change: transform;
+  }
+  .next-prayer-progress-fill {
+    background: var(--color-pop);
+    transform-origin: right center;
+  }
+  .chrono-dates {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.15rem;
+    margin-top: 0.1rem;
+  }
+  @media (min-width: 768px) {
+    .chrono-dates {
+      align-items: flex-start;
+    }
+  }
+  .chrono-date-greg {
+    font-family: var(--font-mono);
+    font-size: 10px;
+    letter-spacing: 0.22em;
+    text-transform: uppercase;
+    color: var(--color-fg-muted);
+  }
+  .chrono-date-hijri {
+    font-family: var(--font-mono);
+    font-size: 10px;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+    color: var(--color-accent);
+    opacity: 0.88;
+  }
+
+  /* ---- Next Prayer Telemetry Panel ---- */
+  .next-prayer-panel {
+    min-width: 190px;
+  }
+  .next-prayer-header {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.45rem;
+  }
+  .next-prayer-dot {
+    width: 6px;
+    height: 6px;
+    border-radius: 9999px;
+    background: var(--color-pop);
+    box-shadow: 0 0 8px var(--color-pop);
+    animation: chrono-pulse 2.4s ease-in-out infinite;
+  }
+  .next-prayer-time-badge {
+    padding: 0.12rem 0.42rem;
+    border: 1px solid var(--color-border);
+    background: var(--color-accent-soft);
+    letter-spacing: 0.08em;
   }
 
   /* On-demand expanding nav — collapsed to a single + trigger,
      expands inline on click. Desktop: centered pill widened to fit
      all 5 items. Mobile (<768px): horizontally scrollable snap strip
      with fade edges — native touch momentum, no JS, compositor-only. */
+  .hero-nav-wrap {
+    padding: 0.25rem;
+    border-radius: 9999px;
+    border: 1px solid transparent;
+    transition: border-color 0.25s ease, background-color 0.25s ease, padding 0.25s ease;
+  }
+  .hero-nav-wrap.is-open {
+    padding: 0.25rem 0.35rem 0.25rem 0.9rem;
+    border-color: var(--color-border);
+    background: color-mix(in srgb, var(--color-surface) 72%, transparent);
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
+  }
   .hero-nav {
     max-width: 0;
     opacity: 0;
@@ -329,10 +508,15 @@
     pointer-events: auto;
   }
   .hero-nav-trigger {
-    transition: transform .35s cubic-bezier(.22,1,.36,1), color .2s, border-color .2s;
+    background: color-mix(in srgb, var(--color-surface) 60%, transparent);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    transition: transform .35s cubic-bezier(.22,1,.36,1), color .2s, border-color .2s, background-color .2s;
   }
   .hero-nav-wrap.is-open .hero-nav-trigger {
     transform: rotate(45deg);
+    border-color: var(--color-accent);
+    color: var(--color-accent);
   }
 
   /* Desktop (>=768px): inline pill. 440px fits all 5 items comfortably
@@ -375,7 +559,13 @@
   .prayer-segments {
     position: relative;
     border: 1px solid var(--color-border);
-    background: var(--color-surface);
+    border-radius: 14px;
+    background: color-mix(in srgb, var(--color-surface) 74%, transparent);
+    backdrop-filter: blur(22px) saturate(150%);
+    -webkit-backdrop-filter: blur(22px) saturate(150%);
+    box-shadow:
+      inset 0 1px 0 color-mix(in srgb, var(--color-fg) 8%, transparent),
+      0 20px 50px -16px var(--color-shadow);
     overflow: hidden;
   }
   .prayer-indicator {
@@ -385,6 +575,7 @@
     height: 2px;
     width: calc(100% / var(--count, 5));
     background: var(--color-accent);
+    box-shadow: 0 0 10px var(--color-accent);
     transform: translateX(calc(var(--active, 0) * 100%));
     transition: transform 0.4s cubic-bezier(0.22, 1, 0.36, 1);
     pointer-events: none;
@@ -392,36 +583,43 @@
   }
   .prayer-segment {
     flex: 1 1 0;
-    min-height: 48px;
-    padding: 0.7rem 0.25rem;
+    min-height: 54px;
+    padding: 0.8rem 0.35rem;
     display: flex;
     flex-direction: column;
     align-items: center;
     justify-content: center;
-    gap: 0.25rem;
+    gap: 0.3rem;
     background: transparent;
     border: none;
     border-right: 1px solid var(--color-border-2);
     cursor: pointer;
     position: relative;
     z-index: 1;
-    transition: color 0.2s ease;
+    transition: color 0.2s ease, background-color 0.25s ease;
+  }
+  .prayer-segment:hover {
+    background: color-mix(in srgb, var(--color-accent-soft) 55%, transparent);
+  }
+  .prayer-segment[aria-pressed="true"] {
+    background: var(--color-accent-soft);
   }
   .prayer-segment:last-child {
     border-right: none;
   }
   .prayer-segment-name {
-    font-size: 11px;
+    font-size: 10px;
+    font-weight: 500;
     text-transform: uppercase;
-    letter-spacing: 0.2em;
+    letter-spacing: 0.22em;
     line-height: 1;
   }
   .prayer-segment-time {
-    font-size: 10px;
+    font-size: 11px;
     font-variant-numeric: tabular-nums;
-    letter-spacing: 0.04em;
+    letter-spacing: 0.05em;
     line-height: 1;
-    opacity: 0.5;
+    opacity: 0.58;
     transition: opacity 0.2s ease;
   }
   .prayer-segment:hover .prayer-segment-time {
@@ -721,17 +919,14 @@
     margin-block: auto;
   }
 
-  /* Theme toggle — glass island pill, top-right. Both icons always visible;
+  /* Theme toggle — glass island pill, top-centered. Both icons always visible;
      a sliding accent indicator eases between sun (light, left) and moon
-     (dark, right). --active (0/1) is set on the button by syncThemeIcon().
-     Indicator travel = its own width (icons sit flush, gap:0), so
-     translateX(100%) lands exactly on the second slot — same math as the
-     prayer-picker. backdrop-blur gives the floating-glass control-center
-     feel; safe-area insets clear the notch on mobile. */
+     (dark, right). --active (0/1) is set on the button by syncThemeIcon(). */
   .theme-toggle {
     position: fixed;
     top: calc(env(safe-area-inset-top, 0px) + 1rem);
-    right: calc(env(safe-area-inset-right, 0px) + 1rem);
+    left: 50%;
+    transform: translateX(-50%);
     z-index: 30;
     display: inline-flex;
     align-items: center;
@@ -739,14 +934,15 @@
     padding: 0.1875rem;
     border-radius: 9999px;
     border: 1px solid var(--color-border);
-    background: color-mix(in srgb, var(--color-surface) 55%, transparent);
-    backdrop-filter: blur(14px) saturate(140%);
-    -webkit-backdrop-filter: blur(14px) saturate(140%);
+    background: color-mix(in srgb, var(--color-surface) 68%, transparent);
+    backdrop-filter: blur(16px) saturate(140%);
+    -webkit-backdrop-filter: blur(16px) saturate(140%);
+    box-shadow: 0 6px 20px -8px var(--color-shadow), inset 0 1px 0 color-mix(in srgb, var(--color-fg) 6%, transparent);
     cursor: pointer;
-    transition: border-color 0.25s ease, background-color 0.3s ease, transform 0.1s ease;
+    transition: border-color 0.25s ease, background-color 0.3s ease, box-shadow 0.3s ease, transform 0.1s ease;
   }
   .theme-toggle:hover { border-color: var(--color-fg-muted); }
-  .theme-toggle:active { transform: scale(0.96); }
+  .theme-toggle:active { transform: translateX(-50%) scale(0.96); }
 
   .theme-toggle-icon {
     position: relative;
@@ -776,6 +972,29 @@
     transition: transform 0.4s cubic-bezier(0.22, 1, 0.36, 1);
     pointer-events: none;
     will-change: transform;
+  }
+
+  /* Location pill — top-right mission-control telemetry badge */
+  .location-pill {
+    padding: 0.3rem 0.7rem;
+    border-radius: 9999px;
+    border: 1px solid var(--color-border);
+    background: color-mix(in srgb, var(--color-surface) 60%, transparent);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    cursor: pointer;
+    transition: border-color 0.2s ease, background-color 0.2s ease;
+  }
+  .location-pill:hover {
+    border-color: var(--color-accent);
+    background: var(--color-accent-soft);
+  }
+  .location-pill-dot {
+    width: 5px;
+    height: 5px;
+    border-radius: 9999px;
+    background: var(--color-accent);
+    box-shadow: 0 0 6px var(--color-accent);
   }
 }
 

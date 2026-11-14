@@ -2,6 +2,8 @@
 
 A single-screen prayer times app for Indonesian Muslims and the diaspora. Three things, no more: the clock, the next prayer, the qibla direction. Everything else — full schedule, niat text, location and method settings — lives in drawers that slide up when you ask.
 
+![Waktu Sholat Preview](./preview.png)
+
 Built on the **GOTH stack**: Go, templ, Tailwind, HTMX. Ships as a web server and a Wails desktop app from the same codebase. No frontend framework, no build step beyond `templ generate` and Tailwind, no external API calls at runtime. Prayer times are computed locally with [`hablullah/go-prayer`](https://github.com/hablullah/go-prayer); qibla is a great-circle bearing from your coordinates to the Ka'bah.
 
 > **Waktu Sholat** is Indonesian for "prayer times." The interface is in Bahasa Indonesia. The diaspora city presets (Mecca, Medina, Cairo, Istanbul, London, New York) keep it useful outside Indonesia too.

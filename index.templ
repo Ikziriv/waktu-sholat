@@ -15,12 +15,13 @@ templ IndexPage(data PageData) {
 				Waktu Sholat
 			</h1>
 			<button
-				class="flex items-center gap-2 font-mono text-[11px] tracking-wider text-fg-muted transition-colors hover:text-accent"
+				class="location-pill flex items-center gap-2 font-mono text-[11px] tracking-wider text-fg-muted transition-colors hover:text-fg"
 				hx-get="/partials/location"
 				hx-target="#drawer-body"
 				hx-swap="innerHTML"
 				hx-on::after-request="openDrawer()"
 			>
+				<span class="location-pill-dot" aria-hidden="true"></span>
 				<span class="text-accent">
 					if data.CityName != "" {
 						{ data.CityName }
@@ -28,23 +29,85 @@ templ IndexPage(data PageData) {
 						GPS
 					}
 				</span>
-				<span class="text-fg-dim">●</span>
 			</button>
 		</div>
 
-		// Center — clock (left) + qibla (center) + next prayer (right).
+		// Center — clock (left) + qibla & quick-nav (center) + next prayer (right).
 		// Mobile: stacked, centered. md+: 3-column grid so the compass stays
 		// dead-center regardless of side-content width or whether NextPrayer
-		// is present (the right column is always reserved). justify-between
-		// drifted the qibla when the side blocks had unequal widths or when
-		// NextPrayer was nil (only 2 items → qibla pushed right).
+		// is present (the right column is always reserved).
 		<div class="flex flex-1 flex-col items-center justify-center gap-6 md:gap-8">
 			<div class="hero-row flex w-full flex-col items-center justify-center gap-6 md:grid md:grid-cols-3 md:items-center md:gap-4">
 				<div class="hero-cell-left flex justify-center md:justify-self-start">
 					@ClockSection()
 				</div>
-				<div class="hero-cell-center flex justify-center md:justify-self-center">
+				<div class="hero-cell-center flex flex-col items-center gap-3 md:justify-self-center">
 					@QiblaSection(data)
+					// Quick-action menu — paired directly beneath the compass direction text.
+					// Collapsed by default: a frosted + pill. Click expands Jadwal/Niat/Jamak/Ramadhan/Lokasi inline.
+					<div class="hero-reveal hero-nav-wrap flex items-center justify-center gap-3" id="nav-wrap">
+						<nav
+							id="bottom-nav"
+							class="hero-nav flex items-center gap-4 font-mono text-[10px] uppercase tracking-[0.2em]"
+							aria-label="Menu navigasi"
+						>
+							<button
+								class="text-fg-muted transition-colors hover:text-fg"
+								hx-get="/partials/schedule"
+								hx-target="#drawer-body"
+								hx-swap="innerHTML"
+								hx-on::after-request="openDrawer(); closeNav()"
+							>
+								Jadwal
+							</button>
+							<button
+								class="text-fg-muted transition-colors hover:text-fg"
+								hx-get="/partials/niat-list"
+								hx-target="#drawer-body"
+								hx-swap="innerHTML"
+								hx-on::after-request="openDrawer(); closeNav()"
+							>
+								Niat
+							</button>
+							<button
+								class="text-fg-muted transition-colors hover:text-fg"
+								hx-get="/partials/jamak-list"
+								hx-target="#drawer-body"
+								hx-swap="innerHTML"
+								hx-on::after-request="openDrawer(); closeNav()"
+							>
+								Jamak
+							</button>
+							<button
+								class="text-fg-muted transition-colors hover:text-fg"
+								hx-get="/partials/ramadan"
+								hx-target="#drawer-body"
+								hx-swap="innerHTML"
+								hx-on::after-request="openDrawer(); closeNav()"
+							>
+								Ramadhan
+							</button>
+							<button
+								class="text-fg-muted transition-colors hover:text-fg"
+								hx-get="/partials/location"
+								hx-target="#drawer-body"
+								hx-swap="innerHTML"
+								hx-on::after-request="openDrawer(); closeNav()"
+							>
+								Lokasi
+							</button>
+						</nav>
+						<button
+							class="hero-nav-trigger grid h-7 w-7 place-items-center rounded-full border border-border text-fg-muted transition-colors hover:text-fg hover:border-accent"
+							type="button"
+							onclick="toggleNav()"
+							aria-label="Buka menu"
+							aria-expanded="false"
+							aria-controls="bottom-nav"
+						>
+							+
+						</button>
+					</div>
 				</div>
 				<div class="hero-cell-right flex justify-center md:justify-self-end md:text-right">
 					if data.NextPrayer != nil {
@@ -52,77 +115,15 @@ templ IndexPage(data PageData) {
 					}
 				</div>
 			</div>
-			if data.NextPrayer != nil {
-				@PrayerPicker(data.Schedule, data.NextPrayer)
-			}
 		</div>
 
-		// Bottom nav — on-demand expanding menu, centered.
-		// Collapsed by default: a single + trigger. Click expands the three
-		// drawer triggers inline into a centered pill; + rotates to ×.
-		<div class="hero-reveal hero-nav-wrap flex items-center justify-center gap-4" id="nav-wrap">
-			<nav
-				id="bottom-nav"
-				class="hero-nav flex items-center gap-5 font-mono text-[10px] uppercase tracking-[0.2em]"
-				aria-label="Menu navigasi"
-			>
-				<button
-					class="text-fg-muted transition-colors hover:text-fg"
-					hx-get="/partials/schedule"
-					hx-target="#drawer-body"
-					hx-swap="innerHTML"
-					hx-on::after-request="openDrawer(); closeNav()"
-				>
-					Jadwal
-				</button>
-				<button
-					class="text-fg-muted transition-colors hover:text-fg"
-					hx-get="/partials/niat-list"
-					hx-target="#drawer-body"
-					hx-swap="innerHTML"
-					hx-on::after-request="openDrawer(); closeNav()"
-				>
-					Niat
-				</button>
-				<button
-					class="text-fg-muted transition-colors hover:text-fg"
-					hx-get="/partials/jamak-list"
-					hx-target="#drawer-body"
-					hx-swap="innerHTML"
-					hx-on::after-request="openDrawer(); closeNav()"
-				>
-					Jamak
-				</button>
-				<button
-					class="text-fg-muted transition-colors hover:text-fg"
-					hx-get="/partials/ramadan"
-					hx-target="#drawer-body"
-					hx-swap="innerHTML"
-					hx-on::after-request="openDrawer(); closeNav()"
-				>
-					Ramadhan
-				</button>
-				<button
-					class="text-fg-muted transition-colors hover:text-fg"
-					hx-get="/partials/location"
-					hx-target="#drawer-body"
-					hx-swap="innerHTML"
-					hx-on::after-request="openDrawer(); closeNav()"
-				>
-					Lokasi
-				</button>
-			</nav>
-			<button
-				class="hero-nav-trigger grid h-8 w-8 place-items-center rounded-full border border-border text-fg-muted transition-colors hover:text-fg hover:border-fg-muted"
-				type="button"
-				onclick="toggleNav()"
-				aria-label="Buka menu"
-				aria-expanded="false"
-				aria-controls="bottom-nav"
-			>
-				+
-			</button>
-		</div>
+		// Bottom dock — 5-column prayer schedule bar anchored cleanly at the bottom
+		// so the 3D celestial sphere and astrolabe rings remain unobstructed.
+		if data.NextPrayer != nil {
+			<div class="mt-auto flex w-full justify-center pt-2">
+				@PrayerPicker(data.Schedule, data.NextPrayer)
+			</div>
+		}
 	}
 }
 
@@ -288,32 +289,60 @@ templ OnboardingLocation(cities []City) {
 	</div>
 }
 
-// ClockSection — mission control terminal clock, polled every 1s.
+// ClockSection — precision mission-control chronometer instrument.
+// Driven client-side with zero network jitter, including 60s sweep bar,
+// timezone readout, prayer-phase telemetry, and Gregorian + Hijriyah dates.
 templ ClockSection() {
-	<section
-		class="hero-reveal text-center"
-		hx-get="/partials/clock"
-		hx-trigger="load, every 1s"
-		hx-swap="innerHTML"
-	>
-		<span class="text-fg-dim">--:--:--</span>
+	<section class="hero-reveal flex flex-col items-center md:items-start">
+		<div class="chronometer" id="chronometer-root">
+			<div class="chrono-header">
+				<span class="chrono-live-dot" aria-hidden="true"></span>
+				<span class="chrono-eyebrow" id="chrono-phase-label">WAKTU LOKAL</span>
+				<span class="chrono-tz" id="chrono-tz">LOC</span>
+			</div>
+
+			<time class="chrono-time-row terminal-glow" id="chrono-time">
+				<span class="chrono-hm" id="chrono-hm">--:--</span>
+				<span class="chrono-sec-wrap">
+					<span class="chrono-colon" id="chrono-colon">:</span>
+					<span class="chrono-ss" id="chrono-ss">--</span>
+				</span>
+			</time>
+
+			<div class="chrono-progress-track" aria-hidden="true">
+				<span class="chrono-progress-fill" id="chrono-sec-bar"></span>
+			</div>
+
+			<div class="chrono-dates">
+				<span class="chrono-date-greg" id="chrono-date-greg">---</span>
+				<span class="chrono-date-hijri" id="chrono-date-hijri">---</span>
+			</div>
+		</div>
 	</section>
 }
 
-// NextPrayerSection — red pop alert for next prayer.
-// Sits in the right grid cell of the hero row (reserved even when nil, so
-// the compass stays centered). Cell handles md right-alignment; this
-// section just stacks label → name → countdown. IDs let the prayer
-// picker update it client-side.
+// NextPrayerSection — mission-control target prayer readout.
+// Balances the left-hand chronometer with a structured telemetry card on the right.
 templ NextPrayerSection(next *PrayerTime, in string) {
-	<section class="hero-reveal flex flex-col items-center gap-1.5 text-center md:items-end md:text-right" id="next-prayer-display">
-		<span class="text-[10px] tracking-[0.3em] uppercase text-fg-dim" id="next-prayer-label">
-			sholat berikutnya
-		</span>
-		<span class="font-display text-base font-bold tracking-tight text-pop md:text-lg" id="next-prayer-name">
-			{ PrayerLabel[next.Name] }
-		</span>
-		<span class="font-mono text-xs tabular-nums text-fg-muted" id="next-prayer-countdown">dalam { in }</span>
+	<section class="hero-reveal next-prayer-panel flex flex-col items-center gap-1.5 text-center md:items-end md:text-right" id="next-prayer-display">
+		<div class="next-prayer-header">
+			<span class="next-prayer-dot" aria-hidden="true"></span>
+			<span class="text-[10px] tracking-[0.28em] uppercase text-fg-dim" id="next-prayer-label">
+				sholat berikutnya
+			</span>
+		</div>
+		<div class="flex items-baseline gap-2.5">
+			<span class="font-display text-2xl font-bold tracking-tight text-fg md:text-3xl" id="next-prayer-name">
+				{ PrayerLabel[next.Name] }
+			</span>
+			<span class="next-prayer-time-badge font-mono text-xs tabular-nums text-accent" id="next-prayer-time">
+				{ next.Time.Format("15:04") }
+			</span>
+		</div>
+		<div class="next-prayer-progress-track" aria-hidden="true">
+			<span class="next-prayer-progress-fill" id="next-prayer-bar"></span>
+		</div>
+		<span class="font-mono text-xs tabular-nums tracking-wider text-fg-muted" id="next-prayer-countdown">dalam { in }</span>
 	</section>
 }
 

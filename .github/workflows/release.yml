@@ -33,6 +33,7 @@ jobs:
       - name: Generate templ + compile Tailwind
         run: |
           templ generate
+          npm install --no-save tailwindcss @tailwindcss/cli
           npx @tailwindcss/cli -i input.css -o static/out.css --minify
 
       - name: Build portable web exe
